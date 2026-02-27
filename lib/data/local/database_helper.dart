@@ -33,7 +33,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await db.execute('''
         CREATE TABLE vaccination_records(
@@ -53,7 +53,9 @@ class DatabaseHelper {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT,
           phone TEXT UNIQUE,
-          password TEXT
+          password TEXT,
+          dob TEXT,
+          gender TEXT
         )
         ''');
       },
@@ -80,6 +82,14 @@ class DatabaseHelper {
             await db.execute('ALTER TABLE vaccination_records ADD COLUMN imagePath TEXT DEFAULT ""');
           } catch (e) {
             debugPrint("Column imagePath might already exist: $e");
+          }
+        }
+        if (oldVersion < 5) {
+          try {
+            await db.execute('ALTER TABLE users ADD COLUMN dob TEXT DEFAULT ""');
+            await db.execute('ALTER TABLE users ADD COLUMN gender TEXT DEFAULT ""');
+          } catch (e) {
+            debugPrint("Columns dob/gender might already exist: $e");
           }
         }
       },

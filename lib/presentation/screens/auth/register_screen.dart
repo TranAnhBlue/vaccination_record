@@ -186,8 +186,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onPressed: !_agreeToTerms || vm.loading
                     ? null
                     : () async {
-                        if (nameController.text.isEmpty ||
-                            phoneController.text.isEmpty ||
+                        if (nameController.text.trim().isEmpty ||
+                            phoneController.text.trim().isEmpty ||
                             passwordController.text.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text("Vui lòng nhập đầy đủ thông tin")),
@@ -195,9 +195,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return;
                         }
 
+                        if (phoneController.text.trim().length < 10) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Số điện thoại không hợp lệ")),
+                          );
+                          return;
+                        }
+
                         if (passwordController.text != confirmController.text) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Mật khẩu không khớp")),
+                            const SnackBar(content: Text("Mật khẩu xác nhận không khớp")),
+                          );
+                          return;
+                        }
+
+                        if (passwordController.text.length < 6) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Mật khẩu phải có ít nhất 6 ký tự")),
                           );
                           return;
                         }

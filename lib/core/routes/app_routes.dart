@@ -6,4 +6,7 @@ class AppRoutes {
   static const detail = "/detail";
   static const forgot = "/forgot";
   static const otp = "/otp";
+  static const profile = "/profile";
+  static const reminders = "/reminders";
+  static const changePassword = "/change-password";
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../core/constants/vaccine_data.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -76,10 +77,10 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
         _buildSectionTitle("Thông tin vaccine"),
         const SizedBox(height: 24),
         _buildLabel("Loại vaccine"),
-        _buildTextField(nameController, "Nhập loại vaccine", validator: (v) => v!.isEmpty ? "Vui lòng nhập loại vaccine" : null),
+        _buildVaccineSelector(),
         const SizedBox(height: 20),
         _buildLabel("Mũi số"),
-        _buildTextField(doseController, "Nhập số mũi", keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? "Vui lòng nhập mũi số" : null),
+        _buildTextFormField(doseController, "Nhập số mũi", keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? "Vui lòng nhập mũi số" : null),
         const SizedBox(height: 32),
         _buildSectionTitle("Thời gian"),
         const SizedBox(height: 24),
@@ -90,10 +91,10 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
         _buildDatePickerTile(_reminderDate, (d) => setState(() => _reminderDate = d), isOptional: true),
         const SizedBox(height: 32),
         _buildLabel("Địa điểm"),
-        _buildTextField(locationController, "Nhập địa điểm tiêm"),
+        _buildTextFormField(locationController, "Nhập địa điểm tiêm"),
         const SizedBox(height: 20),
         _buildLabel("Phản ứng sau tiêm"),
-        _buildTextField(reactionController, "Nhập phản ứng sau tiêm (nếu có)"),
+        _buildTextFormField(reactionController, "Nhập phản ứng sau tiêm (nếu có)"),
         const SizedBox(height: 32),
         _buildLabel("Hình ảnh chứng nhận"),
         _buildImagePicker(),
@@ -126,7 +127,7 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, {TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
+  Widget _buildTextFormField(TextEditingController controller, String hint, {TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
@@ -140,6 +141,51 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
         errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red, width: 1)),
+      ),
+    );
+  }
+
+  Widget _buildVaccineSelector() {
+    return InkWell(
+      onTap: _showVaccinePicker,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                nameController.text.isEmpty ? "Chọn loại vaccine" : nameController.text,
+                style: TextStyle(
+                  color: nameController.text.isEmpty ? const Color(0xFFBDBDBD) : const Color(0xFF1F1F1F),
+                  fontSize: 14,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down, color: Color(0xFF828282)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showVaccinePicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _VaccinePickerSheet(
+        onSelected: (vaccine) {
+          setState(() {
+            nameController.text = vaccine.name;
+          });
+        },
       ),
     );
   }
@@ -303,6 +349,99 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _VaccinePickerSheet extends StatefulWidget {
+  final Function(Vaccine) onSelected;
+
+  const _VaccinePickerSheet({required this.onSelected});
+
+  @override
+  State<_VaccinePickerSheet> createState() => _VaccinePickerSheetState();
+}
+
+class _VaccinePickerSheetState extends State<_VaccinePickerSheet> {
+  String _searchQuery = "";
+  final _searchController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = commonVaccines.where((v) => 
+      v.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      v.disease.toLowerCase().contains(_searchQuery.toLowerCase())
+    ).toList();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Chọn loại vaccine", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: "Tìm kiếm vaccine...",
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    filled: true,
+                    fillColor: const Color(0xFFF3F4F6),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) {
+                final v = filtered[index];
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  title: Text(v.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  subtitle: Text(v.disease, style: const TextStyle(color: Color(0xFF828282), fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                  onTap: () {
+                    widget.onSelected(v);
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+          if (filtered.isEmpty)
+             Padding(
+               padding: const EdgeInsets.all(40),
+               child: Column(
+                 children: [
+                   const Text("Không thấy loại vaccine bạn cần?", style: TextStyle(color: Colors.grey)),
+                   TextButton(
+                     onPressed: () {
+                       widget.onSelected(Vaccine(name: _searchQuery, description: "", disease: ""));
+                       Navigator.pop(context);
+                     }, 
+                     child: Text("Sử dụng tên: '$_searchQuery'", style: const TextStyle(fontWeight: FontWeight.bold))
+                   ),
+                 ],
+               ),
+             ),
+        ],
       ),
     );
   }

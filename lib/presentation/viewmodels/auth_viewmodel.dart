@@ -10,6 +10,7 @@ class AuthViewModel extends ChangeNotifier {
 
   bool loading = false;
   String? error;
+  User? currentUser;
 
   void clearError() {
     error = null;
@@ -22,7 +23,6 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     final user = await repo.login(phone, password);
-
     loading = false;
 
     if (user == null) {
@@ -31,9 +31,62 @@ class AuthViewModel extends ChangeNotifier {
       return false;
     }
 
-    await SessionManager.saveLogin();
+    currentUser = user;
+    await SessionManager.saveLogin(phone);
     notifyListeners();
     return true;
+  }
+
+  Future<void> loadUser() async {
+    final phone = await SessionManager.getPhone();
+    if (phone != null) {
+      currentUser = await repo.getUserDetails(phone);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> changePassword(String oldPassword, String newPassword) async {
+    if (currentUser == null) return false;
+    
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final success = await repo.changePassword(currentUser!.phone, oldPassword, newPassword);
+      loading = false;
+      if (!success) {
+        error = "Mật khẩu cũ không chính xác";
+      }
+      notifyListeners();
+      return success;
+    } catch (e) {
+      loading = false;
+      error = "Lỗi khi đổi mật khẩu";
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateProfile(String name, String dob, String gender) async {
+    if (currentUser == null) return false;
+    
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      await repo.updateProfile(currentUser!.phone, name, dob, gender);
+      await loadUser(); // Refresh local state
+      loading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      loading = false;
+      error = "Lỗi khi cập nhật hồ sơ";
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> register(

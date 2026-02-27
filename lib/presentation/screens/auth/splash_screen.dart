@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:provider/provider.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/constants/session_manager.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -35,13 +37,18 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkSession() async {
-    final logged = await SessionManager.isLoggedIn();
-    if (!mounted) return;
-
-    if (logged) {
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+    final authVm = context.read<AuthViewModel>();
+    final isLoggedIn = await SessionManager.isLoggedIn();
+    
+    if (isLoggedIn) {
+      await authVm.loadUser();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      }
     } else {
-      Navigator.pushReplacementNamed(context, AppRoutes.login);
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
     }
   }
 

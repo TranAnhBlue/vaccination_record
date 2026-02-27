@@ -6,6 +6,9 @@ import '../../presentation/screens/auth/otp_screen.dart';
 import '../../presentation/screens/auth/splash_screen.dart';
 import '../../presentation/screens/home_screen.dart';
 import '../../presentation/screens/vaccination_detail_screen.dart';
+import '../../presentation/screens/reminder_screen.dart';
+import '../../presentation/screens/profile_screen.dart';
+import '../../presentation/screens/change_password_screen.dart';
 import '../../domain/entities/vaccination_record.dart';
 import 'app_routes.dart';
 
@@ -29,6 +32,15 @@ Route<dynamic> generateRoute(RouteSettings settings) {
 
     case AppRoutes.otp:
       return MaterialPageRoute(builder: (_) => const OtpScreen());
+
+    case AppRoutes.reminders:
+      return MaterialPageRoute(builder: (_) => const ReminderScreen());
+
+    case AppRoutes.profile:
+      return MaterialPageRoute(builder: (_) => const ProfileScreen());
+
+    case AppRoutes.changePassword:
+      return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
 
     default:
       return MaterialPageRoute(builder: (_) => const SplashScreen());

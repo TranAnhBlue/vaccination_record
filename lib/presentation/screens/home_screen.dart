@@ -3,9 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/routes/app_routes.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
+import '../viewmodels/auth_viewmodel.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
 import 'add_record_screen.dart';
+import 'reminder_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,8 +38,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             if (_currentIndex == 0) _buildOverview(vm),
             if (_currentIndex == 1) _buildVaccinationHistory(vm),
-            if (_currentIndex == 2) const Center(child: Text("Tính năng đang phát triển")),
-            if (_currentIndex == 3) const Center(child: Text("Hồ sơ người dùng")),
+            if (_currentIndex == 2) const Expanded(child: ReminderScreen()),
+            if (_currentIndex == 3) const Expanded(child: ProfileScreen()),
           ],
         ),
       ),
@@ -112,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text("Chào buổi sáng,", style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 4),
-            Text("Trần Đức Anh", style: Theme.of(context).textTheme.displayMedium),
+            Text(context.watch<AuthViewModel>().currentUser?.name ?? "Trần Đức Anh", style: Theme.of(context).textTheme.displayMedium),
           ],
         ),
         Row(
