@@ -38,8 +38,9 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
   }
 
   @override
-  Future<List<VaccinationRecord>> getRecords() {
-    return dao.getAll();
+  Future<List<VaccinationRecord>> getRecords() async {
+    final models = await dao.getAll();
+    return models.map((e) => e as VaccinationRecord).toList();
   }
 
   @override

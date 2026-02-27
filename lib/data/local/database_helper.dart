@@ -1,5 +1,9 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -13,11 +17,23 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDB() async {
-    final path = join(await getDatabasesPath(), 'vaccination.db');
+    if (kIsWeb) {
+      databaseFactory = databaseFactoryFfiWeb;
+    } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+
+    final String path;
+    if (kIsWeb) {
+      path = 'vaccination.db';
+    } else {
+      path = join(await getDatabasesPath(), 'vaccination.db');
+    }
 
     return openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: (db, version) async {
         await db.execute('''
         CREATE TABLE vaccination_records(
@@ -51,6 +67,20 @@ class DatabaseHelper {
             password TEXT
           )
           ''');
+        }
+        if (oldVersion < 3) {
+          try {
+            await db.execute('ALTER TABLE vaccination_records ADD COLUMN reminderDate TEXT DEFAULT ""');
+          } catch (e) {
+            debugPrint("Column reminderDate might already exist: $e");
+          }
+        }
+        if (oldVersion < 4) {
+          try {
+            await db.execute('ALTER TABLE vaccination_records ADD COLUMN imagePath TEXT DEFAULT ""');
+          } catch (e) {
+            debugPrint("Column imagePath might already exist: $e");
+          }
         }
       },
     );

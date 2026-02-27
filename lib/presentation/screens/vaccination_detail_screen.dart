@@ -8,12 +8,21 @@ import '../viewmodels/vaccination_viewmodel.dart';
 import 'edit_record_screen.dart';
 
 class VaccinationDetailScreen extends StatelessWidget {
-  final VaccinationRecord record;
+  final VaccinationRecord initialRecord;
 
-  const VaccinationDetailScreen({super.key, required this.record});
+  const VaccinationDetailScreen({super.key, required this.initialRecord});
 
   @override
   Widget build(BuildContext context) {
+    // Watch for changes in the ViewModel
+    final vm = context.watch<VaccinationViewModel>();
+    
+    // Find the latest version of this record
+    final VaccinationRecord record = vm.records.firstWhere(
+      (r) => r.id == initialRecord.id,
+      orElse: () => initialRecord,
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -34,23 +43,23 @@ class VaccinationDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStatusCard(),
+            _buildStatusCard(record),
             const SizedBox(height: 32),
             const Text(
               "Thông tin mũi tiêm",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
             ),
             const SizedBox(height: 16),
-            _buildInfoList(),
+            _buildInfoList(record),
             const SizedBox(height: 32),
             const Text(
               "Hình ảnh chứng nhận",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
             ),
             const SizedBox(height: 16),
-            _buildImageAttachment(),
+            _buildImageAttachment(record),
             const SizedBox(height: 48),
-            _buildActionButtons(context),
+            _buildActionButtons(context, record),
             const SizedBox(height: 40),
           ],
         ),
@@ -58,7 +67,7 @@ class VaccinationDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusCard() {
+  Widget _buildStatusCard(VaccinationRecord record) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -95,7 +104,7 @@ class VaccinationDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoList() {
+  Widget _buildInfoList(VaccinationRecord record) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -141,7 +150,7 @@ class VaccinationDetailScreen extends StatelessWidget {
 
   Widget _divider() => const Divider(height: 1, color: Color(0xFFF1F5F9), indent: 56);
 
-  Widget _buildImageAttachment() {
+  Widget _buildImageAttachment(VaccinationRecord record) {
     return Container(
       width: double.infinity,
       height: 200,
@@ -168,7 +177,7 @@ class VaccinationDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, VaccinationRecord record) {
     return Column(
       children: [
         SizedBox(
@@ -188,7 +197,7 @@ class VaccinationDetailScreen extends StatelessWidget {
           width: double.infinity,
           height: 52,
           child: OutlinedButton(
-            onPressed: () => _showDeleteConfirmation(context),
+            onPressed: () => _showDeleteConfirmation(context, record),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.danger,
               side: const BorderSide(color: Color(0xFFFFECEC)),
@@ -202,7 +211,7 @@ class VaccinationDetailScreen extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context) {
+  void _showDeleteConfirmation(BuildContext context, VaccinationRecord record) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -234,8 +243,13 @@ class VaccinationDetailScreen extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () async {
                   await context.read<VaccinationViewModel>().delete(record.id!);
-                  Navigator.pop(ctx); // Close dialog
-                  Navigator.pop(context); // Close detail screen
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Đã xóa mũi tiêm thành công"), backgroundColor: AppTheme.success),
+                    );
+                    Navigator.pop(ctx); // Close dialog
+                    Navigator.pop(context); // Close detail screen
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.danger,

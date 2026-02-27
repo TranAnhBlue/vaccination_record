@@ -21,6 +21,8 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
   late TextEditingController doseController;
   late TextEditingController locationController;
   late TextEditingController reactionController;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
   
   DateTime? _injectionDate;
   DateTime? _reminderDate;
@@ -59,7 +61,10 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: _buildEditForm(),
+        child: Form(
+          key: _formKey,
+          child: _buildEditForm(),
+        ),
       ),
     );
   }
@@ -71,10 +76,10 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
         _buildSectionTitle("Thông tin vaccine"),
         const SizedBox(height: 24),
         _buildLabel("Loại vaccine"),
-        _buildTextField(nameController, "Nhập loại vaccine"),
+        _buildTextField(nameController, "Nhập loại vaccine", validator: (v) => v!.isEmpty ? "Vui lòng nhập loại vaccine" : null),
         const SizedBox(height: 20),
         _buildLabel("Mũi số"),
-        _buildTextField(doseController, "Nhập số mũi", keyboardType: TextInputType.number),
+        _buildTextField(doseController, "Nhập số mũi", keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? "Vui lòng nhập mũi số" : null),
         const SizedBox(height: 32),
         _buildSectionTitle("Thời gian"),
         const SizedBox(height: 24),
@@ -93,34 +98,39 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
         _buildLabel("Hình ảnh chứng nhận"),
         _buildImagePicker(),
         const SizedBox(height: 48),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: _handleUpdate,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        if (_isLoading)
+          const Center(child: CircularProgressIndicator()),
+        if (!_isLoading) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _handleUpdate,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text("Lưu mũi tiêm", style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-            child: const Text("Lưu mũi tiêm", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Hủy", style: TextStyle(color: Color(0xFF828282), fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Hủy", style: TextStyle(color: Color(0xFF828282), fontWeight: FontWeight.bold)),
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 20),
       ],
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, {TextInputType keyboardType = TextInputType.text}) {
-    return TextField(
+  Widget _buildTextField(TextEditingController controller, String hint, {TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      validator: validator,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
@@ -129,6 +139,7 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red, width: 1)),
       ),
     );
   }
@@ -221,18 +232,42 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
   }
 
   void _handleUpdate() async {
-    final vm = context.read<VaccinationViewModel>();
-    await vm.update(VaccinationRecord(
-      id: widget.record.id,
-      vaccineName: nameController.text,
-      dose: int.tryParse(doseController.text) ?? 1,
-      date: DateFormat('yyyy-MM-dd').format(_injectionDate!),
-      reminderDate: _reminderDate != null ? DateFormat('yyyy-MM-dd').format(_reminderDate!) : "",
-      location: locationController.text,
-      note: reactionController.text,
-      imagePath: _imageFile?.path ?? widget.record.imagePath,
-    ));
-    setState(() => _isSuccess = true);
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      try {
+        final vm = context.read<VaccinationViewModel>();
+        await vm.update(VaccinationRecord(
+          id: widget.record.id,
+          vaccineName: nameController.text.trim(),
+          dose: int.tryParse(doseController.text.trim()) ?? 1,
+          date: DateFormat('yyyy-MM-dd').format(_injectionDate!),
+          reminderDate: _reminderDate != null ? DateFormat('yyyy-MM-dd').format(_reminderDate!) : "",
+          location: locationController.text.trim(),
+          note: reactionController.text.trim(),
+          imagePath: _imageFile?.path ?? widget.record.imagePath,
+        ));
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isSuccess = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Cập nhật mũi tiêm thành công"), backgroundColor: AppTheme.success),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Lỗi: ${e.toString()}"), backgroundColor: AppTheme.danger),
+          );
+        }
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Vui lòng nhập đầy đủ thông tin bắt buộc")),
+      );
+    }
   }
 
   Widget _buildSuccessView() {

@@ -6,8 +6,6 @@ import '../viewmodels/vaccination_viewmodel.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
 import 'add_record_screen.dart';
-import 'edit_record_screen.dart';
-import '../viewmodels/auth_viewmodel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -60,11 +58,25 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = DateTime(now.year, now.month, now.day);
     
     int overdue = 0;
-    int upcoming = 0;
+    int upcomingCount = 0;
+    VaccinationRecord? nextRecord;
+
     for (var r in vm.records) {
       final s = _calculateStatus(r, today);
       if (s == "Quá hạn") overdue++;
-      if (s == "Sắp đến hạn") upcoming++;
+      if (s == "Sắp đến hạn") {
+        upcomingCount++;
+        // Keep track of the earliest upcoming record
+        if (nextRecord == null) {
+          nextRecord = r;
+        } else {
+          final currentNext = DateTime.tryParse(nextRecord.reminderDate);
+          final thisRecord = DateTime.tryParse(r.reminderDate);
+          if (currentNext != null && thisRecord != null && thisRecord.isBefore(currentNext)) {
+            nextRecord = r;
+          }
+        }
+      }
     }
 
     return Expanded(
@@ -77,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
             _buildHealthStatusCard(vm.records.length),
             const SizedBox(height: 20),
-            _buildQuickStats(upcoming, overdue),
+            _buildQuickStats(upcomingCount, overdue, nextRecord),
             const SizedBox(height: 32),
             _buildSectionHeader("Lời nhắc tiêm chủng", "Xem lịch"),
             const SizedBox(height: 16),
@@ -178,13 +190,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickStats(int upcoming, int overdue) {
+  Widget _buildQuickStats(int upcomingCount, int overdue, VaccinationRecord? nextRecord) {
+    String nextDateStr = "---";
+    if (nextRecord != null) {
+      final date = DateTime.tryParse(nextRecord.reminderDate);
+      if (date != null) {
+        nextDateStr = DateFormat('dd ').format(date) + "Th${date.month}";
+      }
+    }
+
     return Row(
       children: [
         Expanded(
           child: _buildStatTile(
             "Sắp tới",
-            upcoming > 0 ? "12 Th11" : "---", // Mock date from UI
+            nextDateStr,
             Icons.calendar_today,
             Colors.orange,
           ),

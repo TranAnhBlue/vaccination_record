@@ -22,7 +22,7 @@ Route<dynamic> generateRoute(RouteSettings settings) {
 
     case AppRoutes.detail:
       final record = settings.arguments as VaccinationRecord;
-      return MaterialPageRoute(builder: (_) => VaccinationDetailScreen(record: record));
+      return MaterialPageRoute(builder: (_) => VaccinationDetailScreen(initialRecord: record));
 
     case AppRoutes.forgot:
       return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());

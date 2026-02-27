@@ -27,6 +27,7 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
   File? _imageFile;
   final _picker = ImagePicker();
   bool _isSuccess = false;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -80,25 +81,29 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
               const SizedBox(height: 16),
               _buildImagePicker(),
               const SizedBox(height: 48),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _handleSave,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text("Thêm mũi tiêm", style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
+        if (_isLoading)
+          const Center(child: CircularProgressIndicator()),
+        if (!_isLoading) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _handleSave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(height: 16),
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Hủy", style: TextStyle(color: Color(0xFF828282), fontWeight: FontWeight.bold)),
-                ),
-              ),
+              child: const Text("Thêm mũi tiêm", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Hủy", style: TextStyle(color: Color(0xFF828282), fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
               const SizedBox(height: 40),
             ],
           ),
@@ -127,17 +132,39 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
 
   void _handleSave() async {
     if (_formKey.currentState!.validate()) {
-      final vm = context.read<VaccinationViewModel>();
-      await vm.add(VaccinationRecord(
-        vaccineName: nameController.text,
-        dose: int.tryParse(doseController.text) ?? 1,
-        date: DateFormat('yyyy-MM-dd').format(_injectionDate),
-        reminderDate: _reminderDate != null ? DateFormat('yyyy-MM-dd').format(_reminderDate!) : "",
-        location: locationController.text,
-        note: reactionController.text,
-        imagePath: _imageFile?.path,
-      ));
-      setState(() => _isSuccess = true);
+      setState(() => _isLoading = true);
+      try {
+        final vm = context.read<VaccinationViewModel>();
+        await vm.add(VaccinationRecord(
+          vaccineName: nameController.text.trim(),
+          dose: int.tryParse(doseController.text.trim()) ?? 1,
+          date: DateFormat('yyyy-MM-dd').format(_injectionDate),
+          reminderDate: _reminderDate != null ? DateFormat('yyyy-MM-dd').format(_reminderDate!) : "",
+          location: locationController.text.trim(),
+          note: reactionController.text.trim(),
+          imagePath: _imageFile?.path,
+        ));
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isSuccess = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Đã lưu mũi tiêm thành công"), backgroundColor: AppTheme.success),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Lỗi: ${e.toString()}"), backgroundColor: AppTheme.danger),
+          );
+        }
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Vui lòng nhập đầy đủ thông tin bắt buộc")),
+      );
     }
   }
 
