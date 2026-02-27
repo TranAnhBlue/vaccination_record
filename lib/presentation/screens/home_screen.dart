@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             if (_currentIndex == 0) _buildOverview(vm),
             if (_currentIndex == 1) _buildVaccinationHistory(vm),
-            if (_currentIndex == 2) const Expanded(child: ReminderScreen()),
+            if (_currentIndex == 2) Expanded(child: ReminderScreen(onSeeAll: () => setState(() => _currentIndex = 1))),
             if (_currentIndex == 3) const Expanded(child: ProfileScreen()),
           ],
         ),
@@ -90,11 +90,12 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildHeader(),
             const SizedBox(height: 24),
+            _buildUrgentWarning(vm.records, today),
             _buildHealthStatusCard(vm.records.length),
             const SizedBox(height: 20),
             _buildQuickStats(upcomingCount, overdue, nextRecord),
             const SizedBox(height: 32),
-            _buildSectionHeader("Lời nhắc tiêm chủng", "Xem lịch"),
+            _buildSectionHeader("Lời nhắc tiêm chủng", "Xem lịch", onTap: () => setState(() => _currentIndex = 2)),
             const SizedBox(height: 16),
             _buildReminderList(vm.records, today),
             const SizedBox(height: 32),
@@ -267,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Column(
-      children: upcoming.map((r) => _buildReminderItem(r)).toList(),
+      children: upcoming.take(3).map((r) => _buildReminderItem(r)).toList(),
     );
   }
 
@@ -571,12 +572,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- UTILS ---
-  Widget _buildSectionHeader(String title, String action) {
+  Widget _buildSectionHeader(String title, String action, {VoidCallback? onTap}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(action, style: const TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+        GestureDetector(
+          onTap: onTap,
+          child: Text(action, style: const TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+        ),
       ],
     );
   }
@@ -599,19 +603,87 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildUrgentWarning(List<VaccinationRecord> records, DateTime today) {
+    final urgentRecords = records.where((r) => _calculateStatus(r, today) == "Quá hạn").toList();
+    
+    if (urgentRecords.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF5F5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.danger.withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(color: AppTheme.danger, shape: BoxShape.circle),
+                child: const Icon(Icons.priority_high, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  "Thông báo khẩn cấp",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.danger, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...urgentRecords.take(2).map((r) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                const SizedBox(width: 36),
+                Expanded(
+                  child: Text(
+                    "Mũi tiêm ${r.vaccineName} đã đến hạn hoặc sắp quá hạn. Vui lòng thực hiện tiêm chủng ngay.",
+                    style: const TextStyle(color: Color(0xFFC53030), fontSize: 13, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
   String _calculateStatus(VaccinationRecord r, DateTime today) {
-    if (r.reminderDate.isEmpty) return "Đã tiêm";
-    final reminder = DateTime.tryParse(r.reminderDate);
-    if (reminder == null) return "Đã tiêm";
-    if (reminder.isBefore(today)) return "Quá hạn";
-    if (reminder.isBefore(today.add(const Duration(days: 7)))) return "Sắp đến hạn";
+    // 1. Check if the current injection is in the future (Scheduled)
+    final injectionDate = DateTime.tryParse(r.date);
+    if (injectionDate != null && injectionDate.isAfter(today)) {
+      final diff = injectionDate.difference(today).inDays;
+      if (diff < 3) return "Quá hạn"; // Less than 3 days = Overdue per user request
+      return "Sắp đến hạn";
+    } 
+    
+    // 2. Check the reminder date for the next dose
+    if (r.reminderDate.isNotEmpty) {
+      final reminder = DateTime.tryParse(r.reminderDate);
+      if (reminder != null) {
+        if (reminder.isBefore(today)) return "Quá hạn";
+        
+        final diff = reminder.difference(today).inDays;
+        if (diff < 3) return "Quá hạn";
+        if (diff < 7) return "Sắp đến hạn";
+      }
+    }
+    
     return "Đã tiêm";
   }
 
   List<VaccinationRecord> _getFilteredRecords(List<VaccinationRecord> all) {
+    if (selectedFilter == "Tất cả") return all;
+    
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    if (selectedFilter == "Tất cả") return all;
+    
     return all.where((r) => _calculateStatus(r, today) == selectedFilter).toList();
   }
 

@@ -68,36 +68,94 @@ class VaccinationDetailScreen extends StatelessWidget {
   }
 
   Widget _buildStatusCard(VaccinationRecord record) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    String status = "Đã tiêm";
+    Color statusColor = AppTheme.success;
+    IconData statusIcon = Icons.check;
+
+    // 1. Check if the current injection is in the future
+    final injectionDate = DateTime.tryParse(record.date);
+    if (injectionDate != null && injectionDate.isAfter(today)) {
+      final diff = injectionDate.difference(today).inDays;
+      if (diff < 3) {
+        status = "Quá hạn";
+        statusColor = AppTheme.danger;
+        statusIcon = Icons.priority_high;
+      } else {
+        status = "Sắp đến hạn";
+        statusColor = AppTheme.warning;
+        statusIcon = Icons.calendar_today;
+      }
+    } 
+    // 2. Check the reminder date for the next dose
+    else if (record.reminderDate.isNotEmpty) {
+      final reminder = DateTime.tryParse(record.reminderDate);
+      if (reminder != null) {
+        if (reminder.isBefore(today)) {
+          status = "Quá hạn";
+          statusColor = AppTheme.danger;
+          statusIcon = Icons.priority_high;
+        } else {
+          final diff = reminder.difference(today).inDays;
+          if (diff < 3) {
+            status = "Quá hạn";
+            statusColor = AppTheme.danger;
+            statusIcon = Icons.priority_high;
+          } else if (diff < 7) {
+            status = "Sắp đến hạn";
+            statusColor = AppTheme.warning;
+            statusIcon = Icons.notification_important;
+          }
+        }
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: statusColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: statusColor.withOpacity(0.1)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(
-              color: AppTheme.success,
+            decoration: BoxDecoration(
+              color: statusColor,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check, color: Colors.white, size: 20),
+            child: Icon(statusIcon, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Đã hoàn thành",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F1F1F)),
-              ),
-              Text(
-                "Mũi ${record.dose} - ${record.vaccineName}",
-                style: const TextStyle(color: Color(0xFF828282), fontSize: 13),
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      status,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: statusColor),
+                    ),
+                    if (status == "Quá hạn") ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: AppTheme.danger, borderRadius: BorderRadius.circular(4)),
+                        child: const Text("KHẨN CẤP", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  "Mũi ${record.dose} - ${record.vaccineName}",
+                  style: const TextStyle(color: Color(0xFF828282), fontSize: 13),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -138,10 +196,13 @@ class VaccinationDetailScreen extends StatelessWidget {
           Icon(icon, color: const Color(0xFF828282), size: 22),
           const SizedBox(width: 16),
           Text(label, style: const TextStyle(color: Color(0xFF828282), fontSize: 14)),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F1F1F)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F1F1F)),
+            ),
           ),
         ],
       ),

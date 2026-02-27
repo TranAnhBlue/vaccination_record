@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../../domain/entities/vaccination_record.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 import '../screens/vaccination_detail_screen.dart';
 
 class ReminderScreen extends StatefulWidget {
-  const ReminderScreen({super.key});
+  final VoidCallback? onSeeAll;
+  const ReminderScreen({super.key, this.onSeeAll});
 
   @override
   State<ReminderScreen> createState() => _ReminderScreenState();
 }
 
 class _ReminderScreenState extends State<ReminderScreen> {
-  bool _showAll = false;
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +23,8 @@ class _ReminderScreenState extends State<ReminderScreen> {
     final today = DateTime(now.year, now.month, now.day);
 
     final upcoming = vm.records.where((r) {
-      if (r.reminderDate.isEmpty) return false;
-      final date = DateTime.tryParse(r.reminderDate);
-      return date != null && (date.isAfter(today) || date.isAtSameMomentAs(today));
+      final status = _calculateStatusForFilter(r, today);
+      return status == "Sắp đến hạn" || status == "Sắp tới";
     }).toList();
 
     // Sort by reminder date
@@ -53,22 +53,22 @@ class _ReminderScreenState extends State<ReminderScreen> {
                 const Text("Lịch tiêm sắp tới", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 if (upcoming.length > 3)
                   TextButton(
-                    onPressed: () => setState(() => _showAll = !_showAll),
-                    child: Text(
-                      _showAll ? "Thu gọn" : "Xem tất cả",
-                      style: const TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                    onPressed: widget.onSeeAll,
+                    child: const Text(
+                      "Xem tất cả",
+                      style: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 16), // This SizedBox was missing in the snippet, adding it back for syntactic correctness.
             if (upcoming.isEmpty)
               const Center(child: Padding(
                 padding: EdgeInsets.all(40.0),
                 child: Text("Hôm nay chưa có lịch tiêm mới", style: TextStyle(color: Colors.grey)),
               ))
             else
-              ...(_showAll ? upcoming : upcoming.take(3)).map((r) => _buildReminderCard(context, r, today)).toList(),
+              ...upcoming.map((r) => _buildReminderCard(context, r, today)).toList(),
           ],
         ),
       ),
@@ -125,18 +125,22 @@ class _ReminderScreenState extends State<ReminderScreen> {
     final reminderDate = DateTime.tryParse(reminderDateStr);
     final diff = reminderDate?.difference(today).inDays ?? 0;
     
-    String status = "Sắp tới";
-    Color statusColor = AppTheme.primary;
-    if (diff == 0) {
-      status = "Đã đến hạn";
-      statusColor = AppTheme.primary;
-    } else if (diff < 0) {
-      status = "Quá hạn";
-      statusColor = AppTheme.danger;
-    } else if (diff <= 7) {
-      status = "Sắp đến hạn";
-      statusColor = Colors.orange;
+    // Unified Status Logic
+    final status = _calculateStatusForFilter(r, today);
+    Color statusColor;
+    switch (status) {
+      case "Quá hạn":
+        statusColor = AppTheme.danger;
+        break;
+      case "Sắp đến hạn":
+        statusColor = AppTheme.warning;
+        break;
+      default:
+        statusColor = AppTheme.primary;
     }
+
+    final displayDate = reminderDate ?? DateTime.tryParse(r.date);
+    final displayDiff = displayDate?.difference(today).inDays ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -170,11 +174,15 @@ class _ReminderScreenState extends State<ReminderScreen> {
             children: [
               const Icon(Icons.calendar_today, size: 14, color: Color(0xFF828282)),
               const SizedBox(width: 8),
-              Text(
-                diff == 0 ? "Hôm nay, ${DateFormat('dd/MM/yyyy').format(reminderDate!)}" : 
-                "${DateFormat('dd/MM/yyyy').format(reminderDate!)} (Còn $diff ngày)",
-                style: const TextStyle(color: Color(0xFF828282), fontSize: 13),
-              ),
+              if (displayDate != null)
+                Text(
+                  displayDiff == 0 ? "Hôm nay, ${DateFormat('dd/MM/yyyy').format(displayDate)}" : 
+                  displayDiff < 0 ? "${DateFormat('dd/MM/yyyy').format(displayDate)} (Quá ${displayDiff.abs()} ngày)" :
+                  "${DateFormat('dd/MM/yyyy').format(displayDate)} (Còn $displayDiff ngày)",
+                  style: const TextStyle(color: Color(0xFF828282), fontSize: 13),
+                )
+              else
+                const Text("Chưa xác định ngày", style: TextStyle(color: Color(0xFF828282), fontSize: 13)),
             ],
           ),
           const SizedBox(height: 4),
@@ -202,5 +210,24 @@ class _ReminderScreenState extends State<ReminderScreen> {
         ],
       ),
     );
+  }
+  String _calculateStatusForFilter(VaccinationRecord r, DateTime today) {
+    final injectionDate = DateTime.tryParse(r.date);
+    if (injectionDate != null && injectionDate.isAfter(today)) {
+      final d = injectionDate.difference(today).inDays;
+      if (d < 3) return "Quá hạn";
+      return "Sắp đến hạn";
+    }
+    if (r.reminderDate.isNotEmpty) {
+      final reminder = DateTime.tryParse(r.reminderDate);
+      if (reminder != null) {
+        if (reminder.isBefore(today)) return "Quá hạn";
+        final d = reminder.difference(today).inDays;
+        if (d < 3) return "Quá hạn";
+        if (d < 7) return "Sắp đến hạn";
+        return "Sắp tới";
+      }
+    }
+    return "Đã tiêm";
   }
 }
