@@ -17,7 +17,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
         CREATE TABLE vaccination_records(
@@ -25,6 +25,8 @@ class DatabaseHelper {
           vaccineName TEXT,
           dose INTEGER,
           date TEXT,
+          reminderDate TEXT,
+          imagePath TEXT,
           location TEXT,
           note TEXT
         )
@@ -38,6 +40,18 @@ class DatabaseHelper {
           password TEXT
         )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+          CREATE TABLE IF NOT EXISTS users(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            phone TEXT UNIQUE,
+            password TEXT
+          )
+          ''');
+        }
       },
     );
   }

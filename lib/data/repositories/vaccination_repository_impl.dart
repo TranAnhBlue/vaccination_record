@@ -13,6 +13,24 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
         vaccineName: record.vaccineName,
         dose: record.dose,
         date: record.date,
+        reminderDate: record.reminderDate,
+        imagePath: record.imagePath,
+        location: record.location,
+        note: record.note,
+      ),
+    );
+  }
+
+  @override
+  Future<void> updateRecord(VaccinationRecord record) async {
+    await dao.update(
+      VaccinationRecordModel(
+        id: record.id,
+        vaccineName: record.vaccineName,
+        dose: record.dose,
+        date: record.date,
+        reminderDate: record.reminderDate,
+        imagePath: record.imagePath,
         location: record.location,
         note: record.note,
       ),

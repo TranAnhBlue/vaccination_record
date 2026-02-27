@@ -8,6 +8,7 @@ import 'core/routes/app_routes.dart';
 import 'data/local/dao/user_dao.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'presentation/viewmodels/auth_viewmodel.dart';
+import 'presentation/viewmodels/vaccination_viewmodel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,9 @@ void main() async {
       providers: [
         ChangeNotifierProvider(
           create: (_) => AuthViewModel(repo),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => VaccinationViewModel()..load(),
         ),
       ],
       child: const MyApp(),

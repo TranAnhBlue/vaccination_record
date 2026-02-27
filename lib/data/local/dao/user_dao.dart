@@ -23,4 +23,14 @@ class UserDao {
 
     return UserModel.fromMap(result.first);
   }
+
+  Future<bool> existsByPhone(String phone) async {
+    final db = await DatabaseHelper.instance.database;
+    final result = await db.query(
+      "users",
+      where: "phone=?",
+      whereArgs: [phone],
+    );
+    return result.isNotEmpty;
+  }
 }

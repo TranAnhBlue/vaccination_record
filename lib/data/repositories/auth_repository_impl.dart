@@ -34,4 +34,9 @@ class AuthRepositoryImpl implements AuthRepository {
       ),
     );
   }
+
+  @override
+  Future<bool> isPhoneRegistered(String phone) async {
+    return dao.existsByPhone(phone);
+  }
 }

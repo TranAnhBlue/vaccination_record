@@ -22,6 +22,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _agreeToTerms = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthViewModel>().clearError();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final vm = context.watch<AuthViewModel>();
 
@@ -178,6 +186,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onPressed: !_agreeToTerms || vm.loading
                     ? null
                     : () async {
+                        if (nameController.text.isEmpty ||
+                            phoneController.text.isEmpty ||
+                            passwordController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Vui lòng nhập đầy đủ thông tin")),
+                          );
+                          return;
+                        }
+
                         if (passwordController.text != confirmController.text) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text("Mật khẩu không khớp")),
@@ -185,14 +202,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return;
                         }
 
-                        await vm.register(
+                        final success = await vm.register(
                           nameController.text,
                           phoneController.text,
                           passwordController.text,
                         );
 
-                        if (context.mounted) {
-                          Navigator.pop(context);
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              backgroundColor: AppTheme.success,
+                              content: Text("Đăng ký thành công!"),
+                            ),
+                          );
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            AppRoutes.login,
+                            (route) => false,
+                          );
+                        } else if (vm.error != null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppTheme.danger,
+                              content: Text(vm.error!),
+                            ),
+                          );
                         }
                       },
                 child: vm.loading

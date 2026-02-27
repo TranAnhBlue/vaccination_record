@@ -11,6 +11,11 @@ class AuthViewModel extends ChangeNotifier {
   bool loading = false;
   String? error;
 
+  void clearError() {
+    error = null;
+    notifyListeners();
+  }
+
   Future<bool> login(String phone, String password) async {
     loading = true;
     error = null;
@@ -31,10 +36,43 @@ class AuthViewModel extends ChangeNotifier {
     return true;
   }
 
-  Future<void> register(
+  Future<bool> register(
       String name, String phone, String password) async {
-    await repo.register(
-      User(name: name, phone: phone, password: password),
-    );
+    if (name.isEmpty || phone.isEmpty || password.isEmpty) {
+      error = "Vui lòng nhập đầy đủ thông tin";
+      notifyListeners();
+      return false;
+    }
+
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      // 1. Check if phone exists explicitly first
+      final exists = await repo.isPhoneRegistered(phone);
+      if (exists) {
+        loading = false;
+        error = "Số điện thoại này đã được đăng ký";
+        notifyListeners();
+        return false;
+      }
+
+      // 2. Perform registration
+      await repo.register(
+        User(name: name, phone: phone, password: password),
+      );
+      
+      loading = false;
+      notifyListeners();
+      return true;
+    } catch (e, stack) {
+      debugPrint("REGISTRATION_ERROR: $e");
+      debugPrint("STACKTRACE: $stack");
+      loading = false;
+      error = "Đăng ký thất bại. Lỗi: ${e.toString().split(':').last.trim()}";
+      notifyListeners();
+      return false;
+    }
   }
 }

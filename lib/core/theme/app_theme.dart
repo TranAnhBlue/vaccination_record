@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const primary = Color(0xFF2F80ED);
-  static const secondary = Color(0xFF56CCF2);
-  static const textPrimary = Color(0xFF333333);
-  static const textSecondary = Color(0xFF828282);
-  static const background = Color(0xFFFFFFFF);
-  static const inputBackground = Color(0xFFF2F2F2);
+  static const primary = Color(0xFF007BFF);
+  static const secondary = Color(0xFF0DCAF0);
+  static const success = Color(0xFF198754);
+  static const warning = Color(0xFFFFC107);
+  static const danger = Color(0xFFDC3545);
+  static const textPrimary = Color(0xFF1A1A1A);
+  static const textSecondary = Color(0xFF666666);
+  static const background = Color(0xFFF8FAFC);
+  static const cardShadow = Color(0x0F000000);
 
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -17,46 +20,53 @@ class AppTheme {
       seedColor: primary,
       primary: primary,
       secondary: secondary,
+      surface: Colors.white,
     ),
     textTheme: GoogleFonts.interTextTheme().copyWith(
-      displayLarge: const TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
-      displayMedium: const TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
-      displaySmall: const TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
-      bodyLarge: const TextStyle(color: textPrimary, fontSize: 16),
-      bodyMedium: const TextStyle(color: textSecondary, fontSize: 14),
+      displayLarge: GoogleFonts.inter(color: textPrimary, fontWeight: FontWeight.w900, fontSize: 32),
+      displayMedium: GoogleFonts.inter(color: textPrimary, fontWeight: FontWeight.w800, fontSize: 24),
+      titleLarge: GoogleFonts.inter(color: textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
+      bodyLarge: GoogleFonts.inter(color: textPrimary, fontSize: 16),
+      bodyMedium: GoogleFonts.inter(color: textSecondary, fontSize: 14),
+      labelLarge: GoogleFonts.inter(color: textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: true,
+      iconTheme: IconThemeData(color: Colors.black, size: 20),
+      titleTextStyle: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFFF5F7FA),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primary, width: 1),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: primary, width: 1.5),
       ),
-      labelStyle: const TextStyle(color: textSecondary),
-      hintStyle: const TextStyle(color: textSecondary, fontSize: 14),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: danger, width: 1),
+      ),
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: primary,
         foregroundColor: Colors.white,
-        minimumSize: const Size(double.infinity, 50),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        minimumSize: const Size(double.infinity, 56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     ),
   );

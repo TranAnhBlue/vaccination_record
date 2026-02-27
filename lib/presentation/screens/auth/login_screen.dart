@@ -17,6 +17,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthViewModel>().clearError();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final vm = context.watch<AuthViewModel>();
 
@@ -132,7 +140,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           passwordController.text,
                         );
                         if (success && context.mounted) {
-                          Navigator.pushReplacementNamed(context, AppRoutes.home);
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            AppRoutes.splash,
+                            (route) => false,
+                          );
                         }
                       },
                 child: vm.loading

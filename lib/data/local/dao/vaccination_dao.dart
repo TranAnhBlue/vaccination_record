@@ -18,6 +18,16 @@ class VaccinationDao {
     return result.map((e) => VaccinationRecordModel.fromMap(e)).toList();
   }
 
+  Future<void> update(VaccinationRecordModel record) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.update(
+      'vaccination_records',
+      record.toMap(),
+      where: 'id=?',
+      whereArgs: [record.id],
+    );
+  }
+
   Future<void> delete(int id) async {
     final db = await DatabaseHelper.instance.database;
     await db.delete(

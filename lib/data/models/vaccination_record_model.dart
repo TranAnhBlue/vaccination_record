@@ -6,6 +6,8 @@ class VaccinationRecordModel extends VaccinationRecord {
     required super.vaccineName,
     required super.dose,
     required super.date,
+    required super.reminderDate,
+    super.imagePath,
     required super.location,
     required super.note,
   });
@@ -16,6 +18,8 @@ class VaccinationRecordModel extends VaccinationRecord {
       vaccineName: map['vaccineName'],
       dose: map['dose'],
       date: map['date'],
+      reminderDate: map['reminderDate'] ?? "",
+      imagePath: map['imagePath'],
       location: map['location'],
       note: map['note'],
     );
@@ -27,6 +31,8 @@ class VaccinationRecordModel extends VaccinationRecord {
       'vaccineName': vaccineName,
       'dose': dose,
       'date': date,
+      'reminderDate': reminderDate,
+      'imagePath': imagePath,
       'location': location,
       'note': note,
     };

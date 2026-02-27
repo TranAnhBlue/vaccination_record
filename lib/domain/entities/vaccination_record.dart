@@ -3,6 +3,8 @@ class VaccinationRecord {
   final String vaccineName;
   final int dose;
   final String date;
+  final String reminderDate;
+  final String? imagePath;
   final String location;
   final String note;
 
@@ -11,6 +13,8 @@ class VaccinationRecord {
     required this.vaccineName,
     required this.dose,
     required this.date,
+    required this.reminderDate,
+    this.imagePath,
     required this.location,
     required this.note,
   });
