@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vaccination_record/presentation/viewmodels/ai_viewmodel.dart';
 
 import 'core/routes/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -24,6 +25,9 @@ void main() async {
         ),
         ChangeNotifierProvider(
           create: (_) => VaccinationViewModel()..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AIViewModel(),
         ),
       ],
       child: const MyApp(),

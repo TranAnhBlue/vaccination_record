@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import 'add_record_screen.dart';
 import 'reminder_screen.dart';
 import 'profile_screen.dart';
+import 'ai/ai_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,8 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             if (_currentIndex == 0) _buildOverview(vm),
             if (_currentIndex == 1) _buildVaccinationHistory(vm),
-            if (_currentIndex == 2) Expanded(child: ReminderScreen(onSeeAll: () => setState(() => _currentIndex = 1))),
-            if (_currentIndex == 3) const Expanded(child: ProfileScreen()),
+            if (_currentIndex == 2) const Expanded(child: AIScreen()),
+            if (_currentIndex == 3) Expanded(child: ReminderScreen(onSeeAll: () => setState(() => _currentIndex = 1))),
+            if (_currentIndex == 4) const Expanded(child: ProfileScreen()),
           ],
         ),
       ),
@@ -95,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
             _buildQuickStats(upcomingCount, overdue, nextRecord),
             const SizedBox(height: 32),
-            _buildSectionHeader("Lời nhắc tiêm chủng", "Xem lịch", onTap: () => setState(() => _currentIndex = 2)),
+            _buildSectionHeader("Lời nhắc tiêm chủng", "Xem lịch", onTap: () => setState(() => _currentIndex = 3)),
             const SizedBox(height: 16),
             _buildReminderList(vm.records, today),
             const SizedBox(height: 32),
@@ -705,7 +707,8 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedLabelStyle: const TextStyle(fontSize: 10),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: "Trang chủ"),
-          BottomNavigationBarItem(icon: Icon(Icons.access_time), activeIcon: Icon(Icons.access_time_filled), label: "Lịch sử"),
+          BottomNavigationBarItem(icon: Icon(Icons.access_time_outlined), activeIcon: Icon(Icons.access_time_filled), label: "Lịch sử"),
+          BottomNavigationBarItem(icon: Icon(Icons.auto_awesome_outlined), activeIcon: Icon(Icons.auto_awesome), label: "Trợ lý AI"),
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: "Lịch hẹn"),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: "Hồ sơ"),
         ],

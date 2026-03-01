@@ -8,12 +8,16 @@ import '../../presentation/screens/home_screen.dart';
 import '../../presentation/screens/vaccination_detail_screen.dart';
 import '../../presentation/screens/reminder_screen.dart';
 import '../../presentation/screens/profile_screen.dart';
+import '../../presentation/screens/ai/ai_screen.dart';
 import '../../presentation/screens/change_password_screen.dart';
 import '../../domain/entities/vaccination_record.dart';
 import 'app_routes.dart';
 
 Route<dynamic> generateRoute(RouteSettings settings) {
   switch (settings.name) {
+    case AppRoutes.ai:
+      return MaterialPageRoute(builder: (_) => const AIScreen());
+
     case AppRoutes.login:
       return MaterialPageRoute(builder: (_) => const LoginScreen());
 
