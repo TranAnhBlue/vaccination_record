@@ -168,11 +168,9 @@ class _ReminderScreenState extends State<ReminderScreen> {
   }
 
   /// ================= CARD =================
-  Widget _buildReminderCard(
-      BuildContext context,
+  Widget _buildReminderCard(BuildContext context,
       VaccinationRecord r,
       DateTime today) {
-
     final reminderDate = DateTime.tryParse(r.reminderDate);
     final status = _calculateStatus(r, today);
 
@@ -195,7 +193,9 @@ class _ReminderScreenState extends State<ReminderScreen> {
         reminderDate ?? DateTime.tryParse(r.date);
 
     final diff =
-        displayDate?.difference(today).inDays ?? 0;
+        displayDate
+            ?.difference(today)
+            .inDays ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -251,10 +251,13 @@ class _ReminderScreenState extends State<ReminderScreen> {
               if (displayDate != null)
                 Text(
                   diff == 0
-                      ? "Hôm nay, ${DateFormat('dd/MM/yyyy').format(displayDate)}"
+                      ? "Hôm nay, ${DateFormat('dd/MM/yyyy').format(
+                      displayDate)}"
                       : diff < 0
-                      ? "${DateFormat('dd/MM/yyyy').format(displayDate)} (Quá ${diff.abs()} ngày)"
-                      : "${DateFormat('dd/MM/yyyy').format(displayDate)} (Còn $diff ngày)",
+                      ? "${DateFormat('dd/MM/yyyy').format(
+                      displayDate)} (Quá ${diff.abs()} ngày)"
+                      : "${DateFormat('dd/MM/yyyy').format(
+                      displayDate)} (Còn $diff ngày)",
                   style: const TextStyle(
                       color: Color(0xFF828282),
                       fontSize: 13),
@@ -309,23 +312,32 @@ class _ReminderScreenState extends State<ReminderScreen> {
   }
 
   /// ================= STATUS LOGIC =================
-  String _calculateStatus(
-      VaccinationRecord r,
-      DateTime today) {
-
+  String _calculateStatus(VaccinationRecord r,
+      DateTime today,) {
     if (r.reminderDate.isEmpty) {
       return "Đã tiêm";
     }
 
-    final reminder =
-    DateTime.tryParse(r.reminderDate);
+    DateTime? reminder;
+
+    /// ✅ parse dd/MM/yyyy
+    try {
+      reminder = DateFormat('dd/MM/yyyy')
+          .parseStrict(r.reminderDate);
+    } catch (_) {
+      reminder = DateTime.tryParse(r.reminderDate);
+    }
 
     if (reminder == null) {
       return "Đã tiêm";
     }
 
-    final diff =
-        reminder.difference(today).inDays;
+    final reminderDay =
+    DateTime(reminder.year, reminder.month, reminder.day);
+
+    final diff = reminderDay
+        .difference(today)
+        .inDays;
 
     if (diff < 0) return "Quá hạn";
     if (diff == 0) return "Hôm nay";

@@ -284,12 +284,19 @@ class VaccinationDetailScreen extends StatelessWidget {
       VaccinationRecord r,
       DateTime today,
       ) {
-    // Không có lịch nhắc → đã hoàn thành
     if (r.reminderDate.isEmpty) {
       return "Đã tiêm";
     }
 
-    final reminder = DateTime.tryParse(r.reminderDate);
+    DateTime? reminder;
+
+    /// ✅ parse dd/MM/yyyy
+    try {
+      reminder = DateFormat('dd/MM/yyyy')
+          .parseStrict(r.reminderDate);
+    } catch (_) {
+      reminder = DateTime.tryParse(r.reminderDate);
+    }
 
     if (reminder == null) {
       return "Đã tiêm";
