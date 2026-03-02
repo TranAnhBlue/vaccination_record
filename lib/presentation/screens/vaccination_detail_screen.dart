@@ -70,46 +70,36 @@ class VaccinationDetailScreen extends StatelessWidget {
   Widget _buildStatusCard(VaccinationRecord record) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
-    String status = "Đã tiêm";
-    Color statusColor = AppTheme.success;
-    IconData statusIcon = Icons.check;
 
-    // 1. Check if the current injection is in the future
-    final injectionDate = DateTime.tryParse(record.date);
-    if (injectionDate != null && injectionDate.isAfter(today)) {
-      final diff = injectionDate.difference(today).inDays;
-      if (diff < 3) {
-        status = "Quá hạn";
+    final status = _calculateStatus(record, today);
+
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (status) {
+      case "Quá hạn":
         statusColor = AppTheme.danger;
         statusIcon = Icons.priority_high;
-      } else {
-        status = "Sắp đến hạn";
+        break;
+
+      case "Hôm nay":
+        statusColor = Colors.orange;
+        statusIcon = Icons.today;
+        break;
+
+      case "Sắp đến hạn":
         statusColor = AppTheme.warning;
+        statusIcon = Icons.notifications_active;
+        break;
+
+      case "Sắp tới":
+        statusColor = AppTheme.primary;
         statusIcon = Icons.calendar_today;
-      }
-    } 
-    // 2. Check the reminder date for the next dose
-    else if (record.reminderDate.isNotEmpty) {
-      final reminder = DateTime.tryParse(record.reminderDate);
-      if (reminder != null) {
-        if (reminder.isBefore(today)) {
-          status = "Quá hạn";
-          statusColor = AppTheme.danger;
-          statusIcon = Icons.priority_high;
-        } else {
-          final diff = reminder.difference(today).inDays;
-          if (diff < 3) {
-            status = "Quá hạn";
-            statusColor = AppTheme.danger;
-            statusIcon = Icons.priority_high;
-          } else if (diff < 7) {
-            status = "Sắp đến hạn";
-            statusColor = AppTheme.warning;
-            statusIcon = Icons.notification_important;
-          }
-        }
-      }
+        break;
+
+      default:
+        statusColor = AppTheme.success;
+        statusIcon = Icons.check;
     }
 
     return Container(
@@ -138,21 +128,39 @@ class VaccinationDetailScreen extends StatelessWidget {
                   children: [
                     Text(
                       status,
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: statusColor),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: statusColor,
+                      ),
                     ),
                     if (status == "Quá hạn") ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: AppTheme.danger, borderRadius: BorderRadius.circular(4)),
-                        child: const Text("KHẨN CẤP", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.danger,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          "KHẨN CẤP",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ],
                 ),
                 Text(
                   "Mũi ${record.dose} - ${record.vaccineName}",
-                  style: const TextStyle(color: Color(0xFF828282), fontSize: 13),
+                  style: const TextStyle(
+                    color: Color(0xFF828282),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -270,6 +278,33 @@ class VaccinationDetailScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _calculateStatus(
+      VaccinationRecord r,
+      DateTime today,
+      ) {
+    // Không có lịch nhắc → đã hoàn thành
+    if (r.reminderDate.isEmpty) {
+      return "Đã tiêm";
+    }
+
+    final reminder = DateTime.tryParse(r.reminderDate);
+
+    if (reminder == null) {
+      return "Đã tiêm";
+    }
+
+    final reminderDay =
+    DateTime(reminder.year, reminder.month, reminder.day);
+
+    final diff = reminderDay.difference(today).inDays;
+
+    if (diff < 0) return "Quá hạn";
+    if (diff == 0) return "Hôm nay";
+    if (diff <= 3) return "Sắp đến hạn";
+
+    return "Sắp tới";
   }
 
   void _showDeleteConfirmation(BuildContext context, VaccinationRecord record) {
