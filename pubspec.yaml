@@ -72,6 +72,7 @@ dependencies:
   # AI & GENERATIVE SERVICES (via HTTP REST)
   # =============================
   http: ^1.2.2
+  google_generative_ai: ^0.4.3
 
 dev_dependencies:
   flutter_test:

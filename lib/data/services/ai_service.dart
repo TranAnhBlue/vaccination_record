@@ -1,121 +1,60 @@
-import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:google_generative_ai/google_generative_ai.dart';
+import '../../core/config/ai_config.dart';
 
 class AIService {
-  static const String _apiKey = "AIzaSyCsijSSNtyijM3kTrSX72RrKPNYJ1BrQOE";
-  static const String _model = "gemini-2.0-flash-lite";
-  static const String _baseUrl =
-      "https://generativelanguage.googleapis.com/v1/models";
+  late final GenerativeModel _model;
 
-  /// Method for Chatbot — gửi lịch sử chat và tin nhắn mới
-  Future<String> getChatResponse(
-      List<Map<String, dynamic>> history, String message) async {
-    final url = Uri.parse("$_baseUrl/$_model:generateContent?key=$_apiKey");
-
-    // Inject system persona as first turn if history is empty
-    final List<Map<String, dynamic>> contents = [
-      if (history.isEmpty) ...[
-        {
-          "role": "user",
-          "parts": [{"text": "Bạn là trợ lý AI chuyên về y tế và vắc xin. Hãy trả lời bằng tiếng Việt ngắn gọn."}]
-        },
-        {
-          "role": "model",
-          "parts": [{"text": "Được, tôi sẽ trả lời bằng tiếng Việt về các vấn đề y tế và vắc xin."}]
-        },
-      ],
-      ...history,
-      {
-        "role": "user",
-        "parts": [{"text": message}]
-      },
-    ];
-
-    try {
-      http.Response response;
-      int attempts = 0;
-      do {
-        response = await http.post(
-          url,
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode({"contents": contents}),
-        );
-        if (response.statusCode == 429 && attempts < 3) {
-          attempts++;
-          await Future.delayed(Duration(seconds: 5 * attempts)); // 5s, 10s, 15s
-        } else {
-          break;
-        }
-      } while (true);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"] ??
-            "Xin lỗi, tôi không thể trả lời lúc này.";
-      } else if (response.statusCode == 429) {
-        return "Hệ thống đang bận, vui lòng thử lại sau 1 phút.";
-      } else {
-        debugPrint("AI Error ${response.statusCode}: ${response.body}");
-        return "Lỗi từ API (${response.statusCode}): ${_parseError(response.body)}";
-      }
-    } catch (e) {
-      debugPrint("AI Network Error: $e");
-      return "Không thể kết nối tới AI. Kiểm tra kết nối mạng.";
-    }
+  AIService() {
+    _model = GenerativeModel(
+      model: AIConfig.model,
+      apiKey: AIConfig.apiKey,
+    );
   }
 
-  /// Method for Scanning Record (OCR/Analysis)
-  Future<String> scanVaccinationRecord(File imageFile) async {
-    final url = Uri.parse("$_baseUrl/$_model:generateContent?key=$_apiKey");
+  /// ================= CHAT STREAM =================
+  Stream<String> sendMessageStream(
+      List<Map<String, dynamic>> history,
+      String message,
+      ) async* {
+    final contents = <Content>[];
 
-    try {
-      final bytes = await imageFile.readAsBytes();
-      final base64Image = base64Encode(bytes);
-
-      final body = jsonEncode({
-        "contents": [
-          {
-            "parts": [
-              {
-                "text":
-                    "Hãy phân tích ảnh giấy tiêm chủng này và trả về các thông tin: "
-                        "1. Tên vắc xin, 2. Số mũi (liều), 3. Ngày tiêm, 4. Địa điểm. "
-                        "Nếu không thấy ghi là 'Không tìm thấy'. Trả lời tiếng Việt ngắn gọn."
-              },
-              {
-                "inline_data": {"mime_type": "image/jpeg", "data": base64Image}
-              }
-            ]
-          }
-        ]
-      });
-
-      final response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: body,
+    /// convert history -> Content
+    for (final h in history) {
+      contents.add(
+        Content(
+          h["role"],
+          (h["parts"] as List)
+              .map((p) => TextPart(p["text"]))
+              .toList(),
+        ),
       );
+    }
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"] ??
-            "Không thể đọc thông tin từ ảnh.";
-      } else {
-        return "Lỗi quét ảnh (${response.statusCode}): ${_parseError(response.body)}";
+    /// add new message
+    contents.add(Content.text(message));
+
+    final response = _model.generateContentStream(contents);
+
+    await for (final chunk in response) {
+      final text = chunk.text;
+      if (text != null) {
+        yield text;
       }
-    } catch (e) {
-      return "Lỗi phân tích ảnh: $e";
     }
   }
 
-  String _parseError(String body) {
-    try {
-      final data = jsonDecode(body);
-      return data["error"]?["message"] ?? body;
-    } catch (_) {
-      return body;
-    }
+  /// ================= IMAGE SCAN =================
+  Future<String> scanVaccinationRecord(File file) async {
+    final bytes = await file.readAsBytes();
+
+    final response = await _model.generateContent([
+      Content.multi([
+        TextPart("Phân tích giấy tiêm chủng trong ảnh này."),
+        DataPart("image/jpeg", bytes),
+      ])
+    ]);
+
+    return response.text ?? "Không đọc được nội dung.";
   }
 }

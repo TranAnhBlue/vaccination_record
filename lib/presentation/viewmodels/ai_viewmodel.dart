@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../data/services/ai_service.dart';
@@ -5,85 +6,154 @@ import '../../data/models/chat_message.dart';
 
 class AIViewModel extends ChangeNotifier {
   final AIService _aiService = AIService();
+
   final List<ChatMessage> _messages = [];
-  // History in Gemini REST API format: [{role, parts:[{text}]}]
   final List<Map<String, dynamic>> _history = [];
+
   bool _isLoading = false;
+  bool _isTyping = false;
+  bool _disposed = false;
 
   List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
+  bool get isTyping => _isTyping;
 
   AIViewModel() {
     _messages.add(ChatMessage(
-      text: "Xin chào! Tôi là Trợ lý AI. Tôi có thể giúp bạn giải đáp thắc mắc về vắc xin hoặc quét giấy tiêm chủng.",
+      text:
+      "Xin chào! Tôi là Trợ lý AI 🤖.\nTôi có thể giúp bạn về vắc xin hoặc quét giấy tiêm.",
       isUser: false,
       timestamp: DateTime.now(),
     ));
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  // ================= SEND =================
   Future<void> sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
+    if (text.trim().isEmpty || _isLoading) return;
 
     _messages.add(ChatMessage(
       text: text,
       isUser: true,
       timestamp: DateTime.now(),
     ));
-    _isLoading = true;
-    notifyListeners();
 
-    final response = await _aiService.getChatResponse(_history, text);
-
-    // Update history with both user message and model response
-    _history.add({
-      "role": "user",
-      "parts": [{"text": text}]
-    });
-    _history.add({
-      "role": "model",
-      "parts": [{"text": response}]
-    });
-
-    _messages.add(ChatMessage(
-      text: response,
+    /// create AI placeholder
+    final aiMessage = ChatMessage(
+      text: "",
       isUser: false,
       timestamp: DateTime.now(),
-    ));
+    );
 
+    _messages.add(aiMessage);
+
+    _isLoading = true;
+    _isTyping = true;
+    _safeNotify();
+
+    try {
+      await for (final chunk
+          in _aiService.sendMessageStream(_history, text)) {
+        aiMessage.text += chunk;
+        _safeNotify();
+      }
+
+      /// save history
+      _history.add({
+        "role": "user",
+        "parts": [{"text": text}]
+      });
+
+      _history.add({
+        "role": "model",
+        "parts": [{"text": aiMessage.text}]
+      });
+
+      if (_history.length > 20) {
+        _history.removeRange(0, _history.length - 20);
+      }
+    } catch (e) {
+      aiMessage.text = "AI đang bận. Thử lại sau.";
+    }
+
+    _isTyping = false;
     _isLoading = false;
-    notifyListeners();
+    _safeNotify();
   }
 
+  /// ================= TYPE EFFECT =================
+  Future<void> _typingEffect(String text) async {
+    _isTyping = true;
+
+    final message = ChatMessage(
+      text: "",
+      isUser: false,
+      timestamp: DateTime.now(),
+    );
+
+    _messages.add(message);
+    _safeNotify();
+
+    for (int i = 0; i < text.length; i++) {
+      await Future.delayed(const Duration(milliseconds: 18));
+
+      message.text += text[i];
+
+      if (i % 3 == 0) {
+        _safeNotify(); // giảm rebuild
+      }
+    }
+
+    _isTyping = false;
+    _safeNotify();
+  }
+
+  /// ================= IMAGE =================
   Future<void> scanImage(File imageFile) async {
+    if (_isLoading) return;
+
     _isLoading = true;
-    _messages.add(ChatMessage(
-      text: "📷 Đang phân tích ảnh giấy tiêm chủng...",
+
+    final loadingMsg = ChatMessage(
+      text: "📷 Đang phân tích ảnh...",
       isUser: false,
       timestamp: DateTime.now(),
-    ));
-    notifyListeners();
+    );
 
-    final response = await _aiService.scanVaccinationRecord(imageFile);
+    _messages.add(loadingMsg);
+    _safeNotify();
 
-    _messages.removeLast(); // Remove loading message
-    _messages.add(ChatMessage(
-      text: "📋 Kết quả quét:\n$response",
-      isUser: false,
-      timestamp: DateTime.now(),
-    ));
+    final response =
+    await _aiService.scanVaccinationRecord(imageFile);
+
+    _messages.remove(loadingMsg);
+
+    await _typingEffect("📋 Kết quả:\n$response");
 
     _isLoading = false;
-    notifyListeners();
+    _safeNotify();
   }
 
+  /// ================= CLEAR =================
   void clearChat() {
     _messages.clear();
     _history.clear();
+
     _messages.add(ChatMessage(
-      text: "Đã xóa lịch sử chat. Tôi có thể giúp gì thêm cho bạn?",
+      text: "Đã xóa lịch sử chat.",
       isUser: false,
       timestamp: DateTime.now(),
     ));
-    notifyListeners();
+
+    _safeNotify();
   }
 }
