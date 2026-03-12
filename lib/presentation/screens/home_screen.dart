@@ -110,6 +110,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildHealthStatusCard(vm.records.length),
             const SizedBox(height: 20),
             _buildQuickStats(upcomingCount, overdue, nextRecord),
+            const SizedBox(height: 24),
+            _buildFamilyOverviewCard(householdVm),
             const SizedBox(height: 32),
             _buildSectionHeader("Lời nhắc tiêm chủng", "Xem lịch", onTap: () => setState(() => _currentIndex = 3)),
             const SizedBox(height: 16),
@@ -137,6 +139,76 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildFamilyOverviewCard(HouseholdViewModel householdVm) {
+    if (householdVm.members.length <= 1) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.family_restroom, color: AppTheme.primary, size: 20),
+              const SizedBox(width: 8),
+              const Text("Thành viên gia đình", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Spacer(),
+              Text("${householdVm.members.length} người", style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...householdVm.members.map((m) {
+            final isSelected = householdVm.selectedMember?.id == m.id;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: isSelected ? AppTheme.primary.withOpacity(0.2) : Colors.grey.shade100,
+                    child: Text(
+                      m.name.isNotEmpty ? m.name[0].toUpperCase() : "?",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? AppTheme.primary : Colors.grey,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                            Text(m.relationship, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                          ],
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(height: 4),
+                          const Text("Đang xem", style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMemberSwitcher(HouseholdViewModel householdVm) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,6 +231,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () {
                   householdVm.selectMember(member);
                   context.read<VaccinationViewModel>().load(memberId: member.id);
+                },
+                onLongPress: () {
+                  Navigator.pushNamed(context, AppRoutes.editMember, arguments: member).then((_) {
+                    final authVm = context.read<AuthViewModel>();
+                    if (authVm.currentUser != null) {
+                      householdVm.loadMembers(authVm.currentUser!.id!);
+                    }
+                  });
                 },
                 child: Container(
                   width: 70,
@@ -205,7 +285,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildAddMemberButton() {
     return GestureDetector(
       onTap: () {
-        Navigator.pushNamed(context, AppRoutes.addMember);
+        final authVm = context.read<AuthViewModel>();
+        Navigator.pushNamed(context, AppRoutes.addMember).then((_) {
+          if (authVm.currentUser != null) {
+            context.read<HouseholdViewModel>().loadMembers(authVm.currentUser!.id!).then((_) {
+              final hVm = context.read<HouseholdViewModel>();
+              if (hVm.selectedMember != null) {
+                context.read<VaccinationViewModel>().load(memberId: hVm.selectedMember!.id);
+              }
+            });
+          }
+        });
       },
       child: SizedBox(
         width: 70,

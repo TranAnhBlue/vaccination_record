@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../viewmodels/household_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/routes/app_routes.dart';
 
@@ -61,6 +62,10 @@ class ProfileScreen extends StatelessWidget {
               }),
             ]),
             const SizedBox(height: 32),
+            _buildSectionTitle("Quản lý gia đình"),
+            const SizedBox(height: 16),
+            _buildFamilySection(context),
+            const SizedBox(height: 32),
             _buildSectionTitle("Cài đặt tài khoản"),
             const SizedBox(height: 16),
             _buildActionCard([
@@ -89,6 +94,47 @@ class ProfileScreen extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+    );
+  }
+
+  Widget _buildFamilySection(BuildContext context) {
+    final householdVm = context.watch<HouseholdViewModel>();
+    final members = householdVm.members;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: [
+          ...members.map((m) => Column(
+            children: [
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.primary.withAlpha(26),
+                  child: Text(m.name.isNotEmpty ? m.name[0].toUpperCase() : "?",
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                ),
+                title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(m.relationship, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                onTap: () => Navigator.pushNamed(context, AppRoutes.editMember, arguments: m),
+              ),
+              if (m != members.last) const Divider(height: 1, indent: 16),
+            ],
+          )),
+          const Divider(height: 1, indent: 16),
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFFF3F4F6),
+              child: Icon(Icons.add, color: Colors.grey),
+            ),
+            title: const Text("Thêm thành viên mới", style: TextStyle(color: Colors.grey)),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.addMember),
+          ),
+        ],
+      ),
     );
   }
 

@@ -67,22 +67,17 @@ class AIViewModel extends ChangeNotifier {
         _safeNotify();
       }
 
-      /// save history
-      _history.add({
-        "role": "user",
-        "parts": [{"text": text}]
-      });
+      // Only add to history if it wasn't an error message
+      if (!aiMessage.text.startsWith('❌') && !aiMessage.text.startsWith('⚠️') && !aiMessage.text.startsWith('📡')) {
+        _history.add({'role': 'user', 'parts': [{'text': text}]});
+        _history.add({'role': 'model', 'parts': [{'text': aiMessage.text}]});
 
-      _history.add({
-        "role": "model",
-        "parts": [{"text": aiMessage.text}]
-      });
-
-      if (_history.length > 20) {
-        _history.removeRange(0, _history.length - 20);
+        if (_history.length > 20) {
+          _history.removeRange(0, _history.length - 20);
+        }
       }
     } catch (e) {
-      aiMessage.text = "AI đang bận. Thử lại sau.";
+      aiMessage.text = '⚠️ Lỗi không xác định: ${e.toString().split('\n').first}';
     }
 
     _isTyping = false;

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../domain/entities/vaccination_record.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
+import '../viewmodels/household_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 
 class ReminderScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<VaccinationViewModel>();
+    final householdVm = context.watch<HouseholdViewModel>();
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -92,7 +94,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
               )
             else
               ...upcoming.map(
-                    (r) => _buildReminderCard(context, r, today),
+                    (r) => _buildReminderCard(context, r, today, householdVm),
               ),
           ],
         ),
@@ -170,9 +172,13 @@ class _ReminderScreenState extends State<ReminderScreen> {
   /// ================= CARD =================
   Widget _buildReminderCard(BuildContext context,
       VaccinationRecord r,
-      DateTime today) {
+      DateTime today,
+      HouseholdViewModel householdVm) {
     final reminderDate = DateTime.tryParse(r.reminderDate);
     final status = _calculateStatus(r, today);
+    final memberName = r.memberId != null
+        ? householdVm.members.where((m) => m.id == r.memberId).map((m) => m.name).firstOrNull
+        : null;
 
     Color statusColor;
     switch (status) {
@@ -208,6 +214,20 @@ class _ReminderScreenState extends State<ReminderScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (memberName != null) ...[
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 10,
+                  backgroundColor: AppTheme.primary.withOpacity(0.15),
+                  child: Text(memberName[0], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                ),
+                const SizedBox(width: 6),
+                Text(memberName, style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
 
           /// STATUS
           Row(

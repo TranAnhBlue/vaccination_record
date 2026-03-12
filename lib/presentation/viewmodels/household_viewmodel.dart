@@ -41,8 +41,25 @@ class HouseholdViewModel extends ChangeNotifier {
     await loadMembers(member.userId);
   }
 
-  Future<void> deleteMember(int id, int userId) async {
+  Future<void> updateMember(Member member) async {
+    await memberDao.update(MemberModel(
+      id: member.id,
+      userId: member.userId,
+      name: member.name,
+      dob: member.dob,
+      gender: member.gender,
+      relationship: member.relationship,
+    ));
+    final userId = member.userId;
+    if (selectedMember?.id == member.id) {
+      selectedMember = member;
+    }
+    await loadMembers(userId);
+  }
+
+  Future<void> deleteMember(int id) async {
     await memberDao.delete(id);
+    final userId = members.firstWhere((m) => m.id == id, orElse: () => members.first).userId;
     if (selectedMember?.id == id) {
       selectedMember = null;
     }
