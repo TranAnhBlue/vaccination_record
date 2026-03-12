@@ -10,6 +10,7 @@ import 'data/local/dao/user_dao.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'presentation/viewmodels/auth_viewmodel.dart';
 import 'presentation/viewmodels/vaccination_viewmodel.dart';
+import 'presentation/viewmodels/household_viewmodel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,9 @@ void main() async {
         ),
         ChangeNotifierProvider(
           create: (_) => AIViewModel(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => HouseholdViewModel(),
         ),
       ],
       child: const MyApp(),

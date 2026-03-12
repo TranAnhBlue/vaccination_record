@@ -8,9 +8,9 @@ class VaccinationViewModel extends ChangeNotifier {
 
   List<VaccinationRecord> records = [];
 
-  Future<void> load() async {
-    records = await repo.getRecords();
-    if (records.length < 3) { // Ensure at least 3 for demo
+  Future<void> load({int? memberId}) async {
+    records = await repo.getRecords(memberId: memberId);
+    if (records.isEmpty && memberId == null) { // Only seed for primary account if empty
       await seedDemoData();
       records = await repo.getRecords();
     }
@@ -55,17 +55,17 @@ class VaccinationViewModel extends ChangeNotifier {
 
   Future<void> add(VaccinationRecord record) async {
     await repo.addRecord(record);
-    await load();
+    await load(memberId: record.memberId);
   }
 
   Future<void> update(VaccinationRecord record) async {
     await repo.updateRecord(record);
-    await load();
+    await load(memberId: record.memberId);
   }
 
-  Future<void> delete(int id) async {
+  Future<void> delete(int id, {int? memberId}) async {
     await repo.deleteRecord(id);
-    await load();
+    await load(memberId: memberId);
   }
 
   List<VaccinationRecord> get filteredRecords {

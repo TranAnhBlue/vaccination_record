@@ -17,6 +17,7 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
         imagePath: record.imagePath,
         location: record.location,
         note: record.note,
+        memberId: record.memberId,
       ),
     );
   }
@@ -33,13 +34,14 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
         imagePath: record.imagePath,
         location: record.location,
         note: record.note,
+        memberId: record.memberId,
       ),
     );
   }
 
   @override
-  Future<List<VaccinationRecord>> getRecords() async {
-    final models = await dao.getAll();
+  Future<List<VaccinationRecord>> getRecords({int? memberId}) async {
+    final models = await dao.getAllByMember(memberId);
     return models.map((e) => e as VaccinationRecord).toList();
   }
 

@@ -10,6 +10,8 @@ import 'add_record_screen.dart';
 import 'reminder_screen.dart';
 import 'profile_screen.dart';
 import 'ai/ai_screen.dart';
+import '../viewmodels/household_viewmodel.dart';
+import 'suggestions_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,20 +27,31 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<VaccinationViewModel>().load());
+    Future.microtask(() {
+      final authVm = context.read<AuthViewModel>();
+      if (authVm.currentUser != null) {
+        context.read<HouseholdViewModel>().loadMembers(authVm.currentUser!.id!).then((_) {
+          final householdVm = context.read<HouseholdViewModel>();
+          if (householdVm.selectedMember != null) {
+            context.read<VaccinationViewModel>().load(memberId: householdVm.selectedMember!.id);
+          }
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<VaccinationViewModel>();
+    final householdVm = context.watch<HouseholdViewModel>();
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Column(
           children: [
-            if (_currentIndex == 0) _buildOverview(vm),
-            if (_currentIndex == 1) _buildVaccinationHistory(vm),
+            if (_currentIndex == 0) _buildOverview(vm, householdVm),
+            if (_currentIndex == 1) _buildVaccinationHistory(vm, householdVm),
             if (_currentIndex == 2) const Expanded(child: AIScreen()),
             if (_currentIndex == 3) Expanded(child: ReminderScreen(onSeeAll: () => setState(() => _currentIndex = 1))),
             if (_currentIndex == 4) const Expanded(child: ProfileScreen()),
@@ -58,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- OVERVIEW SECTION (Screen 1 in Design) ---
-  Widget _buildOverview(VaccinationViewModel vm) {
+  Widget _buildOverview(VaccinationViewModel vm, HouseholdViewModel householdVm) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
@@ -71,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (s == "Quá hạn") overdue++;
       if (s == "Sắp đến hạn") {
         upcomingCount++;
-        // Keep track of the earliest upcoming record
         if (nextRecord == null) {
           nextRecord = r;
         } else {
@@ -90,7 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
+            _buildHeader(householdVm),
+            const SizedBox(height: 24),
+            _buildMemberSwitcher(householdVm),
             const SizedBox(height: 24),
             _buildUrgentWarning(vm.records, today),
             _buildHealthStatusCard(vm.records.length),
@@ -102,6 +116,20 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildReminderList(vm.records, today),
             const SizedBox(height: 32),
             _buildMedicalKnowledge(),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SuggestionsScreen())),
+                icon: const Icon(Icons.lightbulb_outline, color: Colors.white),
+                label: const Text("Xem gợi ý tiêm chủng theo độ tuổi", style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
             const SizedBox(height: 80),
           ],
         ),
@@ -109,16 +137,108 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildMemberSwitcher(HouseholdViewModel householdVm) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Thành viên gia đình", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 90,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: householdVm.members.length + 1,
+            itemBuilder: (context, index) {
+              if (index == householdVm.members.length) {
+                return _buildAddMemberButton();
+              }
+              final member = householdVm.members[index];
+              final isSelected = householdVm.selectedMember?.id == member.id;
+              
+              return GestureDetector(
+                onTap: () {
+                  householdVm.selectMember(member);
+                  context.read<VaccinationViewModel>().load(memberId: member.id);
+                },
+                child: Container(
+                  width: 70,
+                  margin: const EdgeInsets.only(right: 16),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? AppTheme.primary : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 25,
+                          backgroundColor: Colors.blue.shade100,
+                          child: Text(member.name[0], style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        member.relationship == "Chủ hộ" ? "Tôi" : member.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? AppTheme.primary : Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAddMemberButton() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushNamed(context, AppRoutes.addMember);
+      },
+      child: SizedBox(
+        width: 70,
+        child: Column(
+          children: [
+            Container(
+              height: 54,
+              width: 54,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey.shade300, style: BorderStyle.none),
+              ),
+              child: const Icon(Icons.add, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            const Text("Thêm mới", style: TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(HouseholdViewModel householdVm) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Chào buổi sáng,", style: Theme.of(context).textTheme.bodyMedium),
+            Text("Sổ tiêm chủng gia đình,", style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 4),
-            Text(context.watch<AuthViewModel>().currentUser?.name ?? "Trần Đức Anh", style: Theme.of(context).textTheme.displayMedium),
+            Text(householdVm.selectedMember?.name ?? "Đang tải...", style: Theme.of(context).textTheme.displayMedium),
           ],
         ),
         Row(
@@ -127,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 12),
             const CircleAvatar(
               radius: 20,
-              backgroundImage: NetworkImage("https://i.pravatar.cc/150?u=anh"),
+              backgroundImage: NetworkImage("https://i.pravatar.cc/150?u=family"),
             ),
           ],
         ),
@@ -360,13 +480,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- HISTORY SECTION (Screen 2 & 3 in Design) ---
-  Widget _buildVaccinationHistory(VaccinationViewModel vm) {
+  Widget _buildVaccinationHistory(VaccinationViewModel vm, HouseholdViewModel householdVm) {
     final filteredRecords = _getFilteredRecords(vm.records);
 
     return Expanded(
       child: Column(
         children: [
-          _buildAppHeader("Lịch sử tiêm chủng"),
+          _buildAppHeader("Lịch sử tiêm chủng - ${householdVm.selectedMember?.name ?? ''}"),
           _buildFilterChips(),
           Expanded(
             child: filteredRecords.isEmpty ? _buildEmptyState() : _buildHistoryList(filteredRecords),

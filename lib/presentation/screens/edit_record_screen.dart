@@ -291,6 +291,7 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
           location: locationController.text.trim(),
           note: reactionController.text.trim(),
           imagePath: _imageFile?.path ?? widget.record.imagePath,
+          memberId: widget.record.memberId,
         ));
         if (mounted) {
           setState(() {

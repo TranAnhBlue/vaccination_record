@@ -7,6 +7,7 @@ class VaccinationRecord {
   final String? imagePath;
   final String location;
   final String note;
+  final int? memberId;
 
   VaccinationRecord({
     this.id,
@@ -17,5 +18,6 @@ class VaccinationRecord {
     this.imagePath,
     required this.location,
     required this.note,
+    this.memberId,
   });
 }

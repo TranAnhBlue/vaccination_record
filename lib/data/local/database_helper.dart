@@ -33,8 +33,20 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
+        await db.execute('''
+        CREATE TABLE members(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER,
+          name TEXT,
+          dob TEXT,
+          gender TEXT,
+          relationship TEXT,
+          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+        )
+        ''');
+
         await db.execute('''
         CREATE TABLE vaccination_records(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,18 +56,9 @@ class DatabaseHelper {
           reminderDate TEXT,
           imagePath TEXT,
           location TEXT,
-          note TEXT
-        )
-        ''');
-
-        await db.execute('''
-        CREATE TABLE users(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT,
-          phone TEXT UNIQUE,
-          password TEXT,
-          dob TEXT,
-          gender TEXT
+          note TEXT,
+          memberId INTEGER,
+          FOREIGN KEY (memberId) REFERENCES members (id) ON DELETE CASCADE
         )
         ''');
       },
@@ -84,12 +87,50 @@ class DatabaseHelper {
             debugPrint("Column imagePath might already exist: $e");
           }
         }
-        if (oldVersion < 5) {
+        if (oldVersion < 6) {
           try {
-            await db.execute('ALTER TABLE users ADD COLUMN dob TEXT DEFAULT ""');
-            await db.execute('ALTER TABLE users ADD COLUMN gender TEXT DEFAULT ""');
+            // 1. Create members table
+            await db.execute('''
+            CREATE TABLE IF NOT EXISTS members(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              userId INTEGER,
+              name TEXT,
+              dob TEXT,
+              gender TEXT,
+              relationship TEXT,
+              FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+            )
+            ''');
+
+            // 2. Add memberId to vaccination_records
+            await db.execute('ALTER TABLE vaccination_records ADD COLUMN memberId INTEGER');
+
+            // 3. Migrate existing records to a "Default" member for each user
+            // This is a simplified migration: it assumes existing records belong to the user account owner.
+            final users = await db.query('users');
+            for (var user in users) {
+              final userId = user['id'] as int;
+              final userName = user['name'] as String;
+              
+              // Create a default member for this user
+              final memberId = await db.insert('members', {
+                'userId': userId,
+                'name': userName,
+                'dob': user['dob'] ?? "",
+                'gender': user['gender'] ?? "",
+                'relationship': 'Chủ hộ',
+              });
+
+              // Assign existing records (where memberId is NULL) to this default member
+              // Note: This logic assumes all records currently in DB belong to the primary users.
+              await db.update(
+                'vaccination_records',
+                {'memberId': memberId},
+                where: 'memberId IS NULL',
+              );
+            }
           } catch (e) {
-            debugPrint("Columns dob/gender might already exist: $e");
+            debugPrint("Migration to version 6 failed: $e");
           }
         }
       },

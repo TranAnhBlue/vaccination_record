@@ -7,12 +7,14 @@ class VaccinationDao {
     return db.insert('vaccination_records', record.toMap());
   }
 
-  Future<List<VaccinationRecordModel>> getAll() async {
+  Future<List<VaccinationRecordModel>> getAllByMember(int? memberId) async {
     final db = await DatabaseHelper.instance.database;
 
     final result = await db.query(
       'vaccination_records',
-      orderBy: 'id DESC',
+      where: memberId != null ? 'memberId = ?' : null,
+      whereArgs: memberId != null ? [memberId] : null,
+      orderBy: 'date DESC',
     );
 
     return result.map((e) => VaccinationRecordModel.fromMap(e)).toList();

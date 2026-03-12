@@ -7,9 +7,18 @@ import 'package:image_picker/image_picker.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
+import '../viewmodels/household_viewmodel.dart';
+import '../../domain/entities/member.dart';
 
 class AddRecordScreen extends StatefulWidget {
-  const AddRecordScreen({super.key});
+  final String? initialVaccineName;
+  final int? initialDose;
+
+  const AddRecordScreen({
+    super.key,
+    this.initialVaccineName,
+    this.initialDose,
+  });
 
   @override
   State<AddRecordScreen> createState() => _AddRecordScreenState();
@@ -29,6 +38,20 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
   final _picker = ImagePicker();
   bool _isSuccess = false;
   bool _isLoading = false;
+  Member? _selectedMember;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMember = context.read<HouseholdViewModel>().selectedMember;
+    
+    if (widget.initialVaccineName != null) {
+      nameController.text = widget.initialVaccineName!;
+    }
+    if (widget.initialDose != null) {
+      doseController.text = widget.initialDose.toString();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +79,10 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildSectionTitle("Thông tin thành viên"),
+              const SizedBox(height: 16),
+              _buildMemberSelector(),
+              const SizedBox(height: 32),
               _buildSectionTitle("Thông tin vaccine"),
               const SizedBox(height: 24),
               _buildLabel("Loại vaccine"),
@@ -108,6 +135,32 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
               const SizedBox(height: 40),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberSelector() {
+    final householdVm = context.watch<HouseholdViewModel>();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<Member>(
+          value: _selectedMember,
+          isExpanded: true,
+          hint: const Text("Chọn thành viên"),
+          onChanged: (m) => setState(() => _selectedMember = m),
+          items: householdVm.members.map((m) {
+            return DropdownMenuItem(
+              value: m,
+              child: Text(m.relationship == "Chủ hộ" ? "Hồ sơ của tôi (${m.name})" : m.name),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -189,6 +242,7 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
           location: locationController.text.trim(),
           note: reactionController.text.trim(),
           imagePath: _imageFile?.path,
+          memberId: _selectedMember?.id,
         ));
         if (mounted) {
           setState(() {

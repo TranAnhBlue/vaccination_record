@@ -10,6 +10,7 @@ import '../../presentation/screens/reminder_screen.dart';
 import '../../presentation/screens/profile_screen.dart';
 import '../../presentation/screens/ai/ai_screen.dart';
 import '../../presentation/screens/change_password_screen.dart';
+import '../../presentation/screens/family/add_member_screen.dart';
 import '../../domain/entities/vaccination_record.dart';
 import 'app_routes.dart';
 
@@ -45,6 +46,9 @@ Route<dynamic> generateRoute(RouteSettings settings) {
 
     case AppRoutes.changePassword:
       return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
+      
+    case AppRoutes.addMember:
+      return MaterialPageRoute(builder: (_) => const AddMemberScreen());
 
     default:
       return MaterialPageRoute(builder: (_) => const SplashScreen());

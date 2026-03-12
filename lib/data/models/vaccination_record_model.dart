@@ -10,6 +10,7 @@ class VaccinationRecordModel extends VaccinationRecord {
     super.imagePath,
     required super.location,
     required super.note,
+    super.memberId,
   });
 
   factory VaccinationRecordModel.fromMap(Map<String, dynamic> map) {
@@ -22,6 +23,7 @@ class VaccinationRecordModel extends VaccinationRecord {
       imagePath: map['imagePath'],
       location: map['location'],
       note: map['note'],
+      memberId: map['memberId'],
     );
   }
 
@@ -35,6 +37,7 @@ class VaccinationRecordModel extends VaccinationRecord {
       'imagePath': imagePath,
       'location': location,
       'note': note,
+      'memberId': memberId,
     };
   }
 }

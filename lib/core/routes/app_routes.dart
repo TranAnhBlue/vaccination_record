@@ -10,4 +10,5 @@ class AppRoutes {
   static const profile = "/profile";
   static const reminders = "/reminders";
   static const changePassword = "/change-password";
+  static const addMember = "/add-member";
 }
