@@ -12,6 +12,7 @@ import '../../presentation/screens/ai/ai_screen.dart';
 import '../../presentation/screens/change_password_screen.dart';
 import '../../presentation/screens/family/add_member_screen.dart';
 import '../../presentation/screens/family/edit_member_screen.dart';
+import '../../presentation/screens/knowledge/knowledge_base_screen.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../domain/entities/member.dart';
 import 'app_routes.dart';
@@ -55,6 +56,9 @@ Route<dynamic> generateRoute(RouteSettings settings) {
     case AppRoutes.editMember:
       final member = settings.arguments as Member;
       return MaterialPageRoute(builder: (_) => EditMemberScreen(member: member));
+
+    case AppRoutes.knowledge:
+      return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
 
     default:
       return MaterialPageRoute(builder: (_) => const SplashScreen());

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../data/repositories/vaccination_repository_impl.dart';
+import '../../data/services/notification_service.dart';
 
 class VaccinationViewModel extends ChangeNotifier {
   final repo = VaccinationRepositoryImpl();
@@ -60,16 +61,19 @@ class VaccinationViewModel extends ChangeNotifier {
 
   Future<void> add(VaccinationRecord record) async {
     await repo.addRecord(record);
+    await NotificationService().scheduleVaccinationReminder(record);
     await load(memberId: record.memberId);
   }
 
   Future<void> update(VaccinationRecord record) async {
     await repo.updateRecord(record);
+    await NotificationService().scheduleVaccinationReminder(record);
     await load(memberId: record.memberId);
   }
 
   Future<void> delete(int id, {int? memberId}) async {
     await repo.deleteRecord(id);
+    await NotificationService().cancelReminder(id);
     await load(memberId: memberId);
   }
 

@@ -93,4 +93,19 @@ class AIService {
       return '⚠️ Không thể phân tích ảnh: ${e.toString().split('\n').first}';
     }
   }
+
+  /// ================= FAMILY INSIGHTS =================
+  Future<String> getFamilyInsights(String summary) async {
+    try {
+      final model = await _getModel();
+      final response = await model.generateContent([
+        Content.text('Dựa trên dữ liệu tiêm chủng của gia đình dưới đây, hãy đưa ra 1 lời khuyên ngắn gọn (tối đa 2 câu) về mũi tiêm quan trọng nhất cần lưu ý tiếp theo hoặc tình trạng chung.\n'
+            'Dữ liệu:\n$summary\n'
+            'Hãy trả lời bằng tiếng Việt, thân thiện và chuyên nghiệp.')
+      ]);
+      return response.text ?? 'Hãy tiếp tục theo dõi lịch tiêm chủng để bảo vệ sức khỏe gia đình.';
+    } catch (_) {
+      return 'AI đang phân tích dữ liệu gia đình bạn. Hãy quay lại sau ít phút.';
+    }
+  }
 }

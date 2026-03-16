@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/routes/app_routes.dart';
+import '../../data/services/ai_service.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../../domain/entities/vaccination_record.dart';
@@ -25,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String selectedFilter = "Tất cả";
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
+  String _aiInsight = "Đang tải phân tích từ AI...";
+  bool _isInsightLoaded = false;
 
   @override
   void dispose() {
@@ -41,7 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
         context.read<HouseholdViewModel>().loadMembers(authVm.currentUser!.id!).then((_) {
           final householdVm = context.read<HouseholdViewModel>();
           if (householdVm.selectedMember != null) {
-            context.read<VaccinationViewModel>().load(memberId: householdVm.selectedMember!.id);
+            context.read<VaccinationViewModel>().load(memberId: householdVm.selectedMember!.id).then((_) {
+              _fetchAIInsights();
+            });
           }
         });
       }
@@ -85,12 +90,17 @@ class _HomeScreenState extends State<HomeScreen> {
     
     int overdue = 0;
     int upcomingCount = 0;
+    int completedCount = 0;
     VaccinationRecord? nextRecord;
 
     for (var r in vm.records) {
-      final s = _calculateStatus(r, today);
+      if (r.isCompleted) {
+        completedCount++;
+        continue;
+      }
+      final s = r.calculateStatus(today);
       if (s == "Quá hạn") overdue++;
-      if (s == "Sắp đến hạn") {
+      if (s == "Sắp đến hạn" || s == "Hôm nay") {
         upcomingCount++;
         if (nextRecord == null) {
           nextRecord = r;
@@ -115,8 +125,16 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMemberSwitcher(householdVm),
             const SizedBox(height: 24),
             _buildUrgentWarning(vm.records, today),
-            _buildHealthStatusCard(vm.records.length),
-            const SizedBox(height: 20),
+            _buildHealthStatusCard(completedCount),
+            const SizedBox(height: 24),
+
+            // --- AI INSIGHT SECTION ---
+            _buildAIInsightCard(),
+            const SizedBox(height: 24),
+
+            // --- QUICK LINKS SECTION ---
+            _buildQuickLinks(),
+            const SizedBox(height: 24),
             _buildQuickStats(upcomingCount, overdue, nextRecord),
             const SizedBox(height: 24),
             _buildFamilyOverviewCard(householdVm),
@@ -367,10 +385,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHealthStatusCard(int total) {
-    // Logic: If total >= 14 (recommended), it's 100%.
+  Widget _buildHealthStatusCard(int completed) {
+    // Logic: If completed >= 14 (recommended), it's 100%.
     int recommended = 14;
-    double percent = (total / recommended).clamp(0, 1) * 100;
+    double percent = (completed / recommended).clamp(0, 1) * 100;
     
     return Container(
       width: double.infinity,
@@ -467,7 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 children: [
                   Text(
-                    "$total",
+                    "$completed",
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 40,
@@ -475,8 +493,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       letterSpacing: 1,
                     ),
                   ),
-                  Text(
-                    " / $recommended",
+                  const Text(
+                    " / 14",
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 20,
@@ -1014,6 +1032,138 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           )),
         ],
+      ),
+    );
+  }
+
+  Future<void> _fetchAIInsights() async {
+    if (!mounted || _isInsightLoaded) return;
+    
+    final vm = context.read<VaccinationViewModel>();
+    final householdVm = context.read<HouseholdViewModel>();
+    
+    if (vm.records.isEmpty) {
+      if (mounted) setState(() => _aiInsight = "Hãy thêm mũi tiêm để AI có thể đưa ra phân tích cho gia đình bạn.");
+      return;
+    }
+
+    final summary = vm.records.map((r) {
+      final member = householdVm.members.where((m) => m.id == r.memberId).map((m) => m.name).firstOrNull ?? "Ẩn danh";
+      return "- $member: ${r.vaccineName} (Mũi ${r.dose}) - Ngày: ${r.date}";
+    }).join("\n");
+
+    try {
+      final insights = await AIService().getFamilyInsights(summary);
+      if (mounted) {
+        setState(() {
+          _aiInsight = insights;
+          _isInsightLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _aiInsight = "Không thể kết nối với trí tuệ nhân tạo lúc này.");
+    }
+  }
+
+  Widget _buildAIInsightCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFFF0F7FF), Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFCCE3FF).withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Phân tích Gia đình AI",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _aiInsight,
+            style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () => setState(() => _currentIndex = 2), // Go to AI tab
+            icon: const Icon(Icons.arrow_forward, size: 16),
+            label: const Text("Hỏi kỹ hơn", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickLinks() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Công cụ hỗ trợ", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _buildLinkCard(
+              "Cẩm nang\nVắc-xin", 
+              Icons.menu_book_rounded, 
+              Colors.orange, 
+              () => Navigator.pushNamed(context, AppRoutes.knowledge)
+            ),
+            const SizedBox(width: 16),
+            _buildLinkCard(
+              "Đặt lịch\ntiêm chủng", 
+              Icons.event_available_rounded, 
+              Colors.green, 
+              () {} // Future feature
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLinkCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade100),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, height: 1.3),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -11,9 +11,11 @@ import 'data/repositories/auth_repository_impl.dart';
 import 'presentation/viewmodels/auth_viewmodel.dart';
 import 'presentation/viewmodels/vaccination_viewmodel.dart';
 import 'presentation/viewmodels/household_viewmodel.dart';
+import 'data/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().init();
 
   /// Dependency Injection
   final repo = AuthRepositoryImpl(UserDao());
