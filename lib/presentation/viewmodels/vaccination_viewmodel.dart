@@ -10,14 +10,16 @@ class VaccinationViewModel extends ChangeNotifier {
 
   Future<void> load({int? memberId}) async {
     records = await repo.getRecords(memberId: memberId);
-    if (records.isEmpty && memberId == null) { // Only seed for primary account if empty
-      await seedDemoData();
-      records = await repo.getRecords();
+    if (records.isEmpty && memberId != null) { 
+      // check if this is the first time loading for this member
+      // we could check a flag, but for now let's just seed if empty for any member initially
+      // await seedDemoData(memberId);
+      // records = await repo.getRecords(memberId: memberId);
     }
     notifyListeners();
   }
 
-  Future<void> seedDemoData() async {
+  Future<void> seedDemoData(int memberId) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -29,6 +31,7 @@ class VaccinationViewModel extends ChangeNotifier {
         reminderDate: DateFormat('yyyy-MM-dd').format(today.add(const Duration(days: 1))),
         location: "VNVC Đà Nẵng",
         note: "Tiêm nhắc lại đúng hạn",
+        memberId: memberId,
       ),
       VaccinationRecord(
         vaccineName: "Vắc xin Phế cầu (Prevenar 13)",
@@ -37,6 +40,7 @@ class VaccinationViewModel extends ChangeNotifier {
         reminderDate: DateFormat('yyyy-MM-dd').format(today.add(const Duration(days: 8))),
         location: "Trung tâm Y tế Quận 1",
         note: "Theo dõi phản ứng nhẹ",
+        memberId: memberId,
       ),
       VaccinationRecord(
         vaccineName: "Vắc xin Cúm (Vaxigrip Tetra)",
@@ -45,6 +49,7 @@ class VaccinationViewModel extends ChangeNotifier {
         reminderDate: DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 5))), // This will be Overdue
         location: "Trạm y tế Phường",
         note: "Nên tiêm nhắc hàng năm",
+        memberId: memberId,
       ),
     ];
 

@@ -75,6 +75,8 @@ class AIViewModel extends ChangeNotifier {
         if (_history.length > 20) {
           _history.removeRange(0, _history.length - 20);
         }
+      } else {
+        // If error, maybe clear placeholder or show as separate message
       }
     } catch (e) {
       aiMessage.text = '⚠️ Lỗi không xác định: ${e.toString().split('\n').first}';
@@ -99,12 +101,12 @@ class AIViewModel extends ChangeNotifier {
     _safeNotify();
 
     for (int i = 0; i < text.length; i++) {
-      await Future.delayed(const Duration(milliseconds: 18));
+      await Future.delayed(const Duration(milliseconds: 10)); // Faster typing
 
       message.text += text[i];
 
-      if (i % 3 == 0) {
-        _safeNotify(); // giảm rebuild
+      if (i % 5 == 0) {
+        _safeNotify();
       }
     }
 

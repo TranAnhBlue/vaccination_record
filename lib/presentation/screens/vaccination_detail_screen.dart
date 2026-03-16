@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
+import '../viewmodels/household_viewmodel.dart';
+import '../widgets/certificate_card.dart';
 import 'edit_record_screen.dart';
 
 class VaccinationDetailScreen extends StatelessWidget {
@@ -16,12 +18,19 @@ class VaccinationDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Watch for changes in the ViewModel
     final vm = context.watch<VaccinationViewModel>();
+    final householdVm = context.watch<HouseholdViewModel>();
     
     // Find the latest version of this record
     final VaccinationRecord record = vm.records.firstWhere(
       (r) => r.id == initialRecord.id,
       orElse: () => initialRecord,
     );
+
+    final member = householdVm.members.firstWhere(
+      (m) => m.id == record.memberId,
+      orElse: () => householdVm.members.isNotEmpty ? householdVm.members.first : initialRecord as dynamic, // Fallback
+    );
+    final memberName = member is String ? "Người dùng" : (member as dynamic).name;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -44,6 +53,10 @@ class VaccinationDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildStatusCard(record),
+            if (record.calculateStatus(DateTime.now()) == "Đã tiêm") ...[
+              const SizedBox(height: 32),
+              CertificateCard(record: record, memberName: memberName),
+            ],
             const SizedBox(height: 32),
             const Text(
               "Thông tin mũi tiêm",
@@ -71,7 +84,7 @@ class VaccinationDetailScreen extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    final status = _calculateStatus(record, today);
+    final status = record.calculateStatus(today);
 
     Color statusColor;
     IconData statusIcon;
@@ -99,7 +112,7 @@ class VaccinationDetailScreen extends StatelessWidget {
 
       default:
         statusColor = AppTheme.success;
-        statusIcon = Icons.check;
+        statusIcon = Icons.verified;
     }
 
     return Container(
@@ -284,34 +297,7 @@ class VaccinationDetailScreen extends StatelessWidget {
       VaccinationRecord r,
       DateTime today,
       ) {
-    if (r.reminderDate.isEmpty) {
-      return "Đã tiêm";
-    }
-
-    DateTime? reminder;
-
-    /// ✅ parse dd/MM/yyyy
-    try {
-      reminder = DateFormat('dd/MM/yyyy')
-          .parseStrict(r.reminderDate);
-    } catch (_) {
-      reminder = DateTime.tryParse(r.reminderDate);
-    }
-
-    if (reminder == null) {
-      return "Đã tiêm";
-    }
-
-    final reminderDay =
-    DateTime(reminder.year, reminder.month, reminder.day);
-
-    final diff = reminderDay.difference(today).inDays;
-
-    if (diff < 0) return "Quá hạn";
-    if (diff == 0) return "Hôm nay";
-    if (diff <= 3) return "Sắp đến hạn";
-
-    return "Sắp tới";
+    return r.calculateStatus(today);
   }
 
   void _showDeleteConfirmation(BuildContext context, VaccinationRecord record) {

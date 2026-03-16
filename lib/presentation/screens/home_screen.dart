@@ -23,6 +23,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0; // Start at Home Overview
   String selectedFilter = "Tất cả";
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -362,45 +370,131 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHealthStatusCard(int total) {
     // Logic: If total >= 14 (recommended), it's 100%.
     int recommended = 14;
-    double percent = (total / recommended * 100).clamp(0, 100);
+    double percent = (total / recommended).clamp(0, 1) * 100;
     
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF007BFF),
+        gradient: LinearGradient(
+          colors: [AppTheme.primary, AppTheme.primary.withBlue(250)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF007BFF).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
+          BoxShadow(
+            color: AppTheme.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.health_and_safety,
+              size: 150,
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Trạng thái sức khỏe", style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text("Đã bảo vệ ${percent.toInt()}%", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Tiến độ tiêm chủng",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "Chỉ số an toàn: ${percent.toInt()}%",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 60,
+                    width: 60,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            value: percent / 100,
+                            color: Colors.white,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            strokeWidth: 4,
+                          ),
+                          Text(
+                            "${percent.toInt()}%",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.verified_user, color: Colors.white, size: 24),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Text(
+                    "$total",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  Text(
+                    " / $recommended",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const Text(
+                "Mũi tiêm đã hoàn thành trên tổng số khuyến nghị",
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          Text(
-            "$total/$recommended",
-            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 1),
-          ),
-          const Text("Tổng mũi tiêm khuyến nghị", style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -588,15 +682,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAppHeader(String title) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
       color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
         children: [
-          const SizedBox(width: 24), // Placeholder for back button if needed
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          _buildIconButton(Icons.notifications_none),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SizedBox(width: 32), 
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              _buildIconButton(Icons.notifications_none),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSearchBar(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        decoration: InputDecoration(
+          hintText: "Tìm kiếm vắc xin, địa điểm...",
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+          suffixIcon: _searchQuery.isNotEmpty 
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18), 
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = "");
+                  })
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        ),
       ),
     );
   }
@@ -867,36 +995,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _calculateStatus(VaccinationRecord r, DateTime today) {
-    // 1. Check if the current injection is in the future (Scheduled)
-    final injectionDate = DateTime.tryParse(r.date);
-    if (injectionDate != null && injectionDate.isAfter(today)) {
-      final diff = injectionDate.difference(today).inDays;
-      if (diff < 3) return "Quá hạn"; // Less than 3 days = Overdue per user request
-      return "Sắp đến hạn";
-    } 
-    
-    // 2. Check the reminder date for the next dose
-    if (r.reminderDate.isNotEmpty) {
-      final reminder = DateTime.tryParse(r.reminderDate);
-      if (reminder != null) {
-        if (reminder.isBefore(today)) return "Quá hạn";
-        
-        final diff = reminder.difference(today).inDays;
-        if (diff < 3) return "Quá hạn";
-        if (diff < 7) return "Sắp đến hạn";
-      }
-    }
-    
-    return "Đã tiêm";
+    return r.calculateStatus(today);
   }
 
   List<VaccinationRecord> _getFilteredRecords(List<VaccinationRecord> all) {
-    if (selectedFilter == "Tất cả") return all;
+    var filtered = all;
+    
+    // Search query filter
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filtered = filtered.where((r) {
+        return r.vaccineName.toLowerCase().contains(query) || 
+               r.location.toLowerCase().contains(query) ||
+               r.note.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    if (selectedFilter == "Tất cả") return filtered;
     
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
-    return all.where((r) => _calculateStatus(r, today) == selectedFilter).toList();
+    return filtered.where((r) => _calculateStatus(r, today) == selectedFilter).toList();
   }
 
   Widget _buildBottomNav() {

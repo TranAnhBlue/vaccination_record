@@ -3,7 +3,9 @@ import 'package:flutter/cupertino.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../local/dao/user_dao.dart';
+import '../local/dao/member_dao.dart';
 import '../models/user_model.dart';
+import '../models/member_model.dart';
 import '../../core/constants/hash_util.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -31,13 +33,27 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> register(User user) async {
-    await dao.insert(
+    final userId = await dao.insert(
       UserModel(
         name: user.name,
         phone: user.phone,
         password: HashUtil.hash(user.password),
       ),
     );
+
+    // Automatically create a default member for the new user
+    try {
+      final memberDao = MemberDao();
+      await memberDao.insert(MemberModel(
+        userId: userId,
+        name: user.name,
+        dob: "",
+        gender: "",
+        relationship: 'Chủ hộ',
+      ));
+    } catch (e) {
+      debugPrint("Failed to create default member on registration: $e");
+    }
   }
 
   @override

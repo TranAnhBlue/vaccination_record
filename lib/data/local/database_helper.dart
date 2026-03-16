@@ -89,7 +89,7 @@ class DatabaseHelper {
         }
         if (oldVersion < 6) {
           try {
-            // 1. Create members table
+            // 1. Create members table if not exists
             await db.execute('''
             CREATE TABLE IF NOT EXISTS members(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,31 +103,63 @@ class DatabaseHelper {
             ''');
 
             // 2. Add memberId to vaccination_records
-            await db.execute('ALTER TABLE vaccination_records ADD COLUMN memberId INTEGER');
+            final columns = await db.rawQuery('PRAGMA table_info(vaccination_records)');
+            final hasMemberId = columns.any((column) => column['name'] == 'memberId');
+            if (!hasMemberId) {
+              await db.execute('ALTER TABLE vaccination_records ADD COLUMN memberId INTEGER');
+            }
 
             // 3. Migrate existing records to a "Default" member for each user
-            // This is a simplified migration: it assumes existing records belong to the user account owner.
+            // We need to find which user these records belong to.
+            // Since the old schema didn't have userId in vaccination_records, 
+            // we assume all existing records belong to the first user or only user.
+            // However, a better approach is to check if we can distinguish them.
+            // For now, to be safe, we create a default member for EACH user.
+            
             final users = await db.query('users');
-            for (var user in users) {
-              final userId = user['id'] as int;
-              final userName = user['name'] as String;
-              
-              // Create a default member for this user
-              final memberId = await db.insert('members', {
-                'userId': userId,
-                'name': userName,
-                'dob': user['dob'] ?? "",
-                'gender': user['gender'] ?? "",
-                'relationship': 'Chủ hộ',
-              });
+            if (users.isNotEmpty) {
+              for (var user in users) {
+                final userId = user['id'] as int;
+                final userName = user['name'] as String;
+                
+                // Check if default member already exists
+                final existingMembers = await db.query(
+                  'members',
+                  where: 'userId = ? AND relationship = ?',
+                  whereArgs: [userId, 'Chủ hộ'],
+                );
 
-              // Assign existing records (where memberId is NULL) to this default member
-              // Note: This logic assumes all records currently in DB belong to the primary users.
-              await db.update(
-                'vaccination_records',
-                {'memberId': memberId},
-                where: 'memberId IS NULL',
-              );
+                int memberId;
+                if (existingMembers.isEmpty) {
+                  memberId = await db.insert('members', {
+                    'userId': userId,
+                    'name': userName,
+                    'dob': user['dob'] ?? "",
+                    'gender': user['gender'] ?? "",
+                    'relationship': 'Chủ hộ',
+                  });
+                } else {
+                  memberId = existingMembers.first['id'] as int;
+                }
+
+                // If this is the ONLY user, assign all orphaned records to them
+                if (users.length == 1) {
+                  await db.update(
+                    'vaccination_records',
+                    {'memberId': memberId},
+                    where: 'memberId IS NULL',
+                  );
+                }
+                // If multiple users exist, it's ambiguous. 
+                // We'll assign records to the first user as a fallback if unknown.
+                else if (user == users.first) {
+                  await db.update(
+                    'vaccination_records',
+                    {'memberId': memberId},
+                    where: 'memberId IS NULL',
+                  );
+                }
+              }
             }
           } catch (e) {
             debugPrint("Migration to version 6 failed: $e");
