@@ -197,7 +197,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(m.name, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)),
+                  Text(m.name, style: const TextStyle(fontSize: 14)),
                 ],
               ),
             );
@@ -301,7 +301,7 @@ class _BookingScreenState extends State<BookingScreen> {
           children: [
             const Icon(Icons.calendar_today, size: 18, color: AppTheme.primary),
             const SizedBox(width: 12),
-            Expanded(child: Text(DateFormat('dd/MM/yyyy').format(_selectedDate), style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)),
+            Text(DateFormat('dd/MM/yyyy').format(_selectedDate), style: const TextStyle(fontSize: 14)),
           ],
         ),
       ),
@@ -328,7 +328,7 @@ class _BookingScreenState extends State<BookingScreen> {
           children: [
             const Icon(Icons.access_time, size: 18, color: AppTheme.primary),
             const SizedBox(width: 12),
-            Expanded(child: Text(_selectedTime.format(context), style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)),
+            Text(_selectedTime.format(context), style: const TextStyle(fontSize: 14)),
           ],
         ),
       ),
