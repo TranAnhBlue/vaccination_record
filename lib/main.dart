@@ -11,6 +11,7 @@ import 'data/repositories/auth_repository_impl.dart';
 import 'presentation/viewmodels/auth_viewmodel.dart';
 import 'presentation/viewmodels/vaccination_viewmodel.dart';
 import 'presentation/viewmodels/household_viewmodel.dart';
+import 'presentation/viewmodels/settings_viewmodel.dart';
 import 'data/services/notification_service.dart';
 
 void main() async {
@@ -36,6 +37,9 @@ void main() async {
         ),
         ChangeNotifierProvider(
           create: (_) => HouseholdViewModel(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SettingsViewModel(),
         ),
       ],
       child: const MyApp(),

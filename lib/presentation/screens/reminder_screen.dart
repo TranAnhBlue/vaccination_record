@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
 import '../viewmodels/household_viewmodel.dart';
+import '../viewmodels/settings_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 
 class ReminderScreen extends StatefulWidget {
@@ -53,7 +54,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildGeneralSettings(),
+            _buildGeneralSettings(context),
             const SizedBox(height: 32),
 
             /// HEADER
@@ -103,7 +104,8 @@ class _ReminderScreenState extends State<ReminderScreen> {
   }
 
   /// ================= SETTINGS =================
-  Widget _buildGeneralSettings() {
+  Widget _buildGeneralSettings(BuildContext context) {
+    final settingsVm = context.watch<SettingsViewModel>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -157,8 +159,8 @@ class _ReminderScreenState extends State<ReminderScreen> {
                 ),
               ),
               Switch(
-                value: true,
-                onChanged: (_) {},
+                value: settingsVm.notificationsEnabled,
+                onChanged: (val) => settingsVm.setNotificationsEnabled(val),
                 activeColor: Colors.white,
                 activeTrackColor: AppTheme.primary,
               ),

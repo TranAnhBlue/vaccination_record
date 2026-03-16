@@ -2,11 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../../domain/entities/vaccination_record.dart';
 
 class NotificationService {
+  static const String _notificationsEnabledKey = 'notifications_enabled';
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
@@ -68,6 +70,10 @@ class NotificationService {
 
   Future<void> scheduleVaccinationReminder(VaccinationRecord record) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsEnabled = prefs.getBool(_notificationsEnabledKey) ?? true;
+      if (!notificationsEnabled) return;
+
       final reminderDate = DateTime.tryParse(record.reminderDate);
       if (reminderDate == null) return;
 
@@ -106,6 +112,10 @@ class NotificationService {
   }
 
   Future<void> showInstantNotification(String title, String body) async {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool(_notificationsEnabledKey) ?? true;
+    if (!notificationsEnabled) return;
+
     const NotificationDetails notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
         'instant_notifications',
