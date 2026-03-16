@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/services/notification_service.dart';
 import '../../../domain/entities/vaccination_record.dart';
 import '../../../domain/entities/vaccine_info.dart';
 import '../../../data/repositories/vaccine_info_repository.dart';
@@ -369,6 +370,12 @@ class _BookingScreenState extends State<BookingScreen> {
     );
 
     vm.add(record).then((_) {
+      // Show instant feedback notification
+      NotificationService().showInstantNotification(
+        "Đặt lịch thành công",
+        "Lịch tiêm ${_selectedVaccineName} đã được ghi nhận. Bạn sẽ được nhắc vào ngày ${_selectedDate.day}/${_selectedDate.month}."
+      );
+
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

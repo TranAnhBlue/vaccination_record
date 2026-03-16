@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -42,6 +44,28 @@ class NotificationService {
     );
   }
 
+  Future<bool> requestPermissions() async {
+    if (Platform.isAndroid) {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          _notificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      
+      final bool? granted = await androidImplementation?.requestNotificationsPermission();
+      return granted ?? false;
+    } else if (Platform.isIOS) {
+      final bool? granted = await _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+      return granted ?? false;
+    }
+    return true;
+  }
+
   Future<void> scheduleVaccinationReminder(VaccinationRecord record) async {
     try {
       final reminderDate = DateTime.tryParse(record.reminderDate);
@@ -79,6 +103,24 @@ class NotificationService {
       debugPrint("Error scheduling notification: $e");
       // Don't rethrow, so we don't break the booking flow if only notifications fail
     }
+  }
+
+  Future<void> showInstantNotification(String title, String body) async {
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'instant_notifications',
+        'Instant Notifications',
+        importance: Importance.max,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+    await _notificationsPlugin.show(
+      0,
+      title,
+      body,
+      notificationDetails,
+    );
   }
 
   Future<void> cancelReminder(int id) async {

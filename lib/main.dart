@@ -15,7 +15,9 @@ import 'data/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService().init();
+  final notificationService = NotificationService();
+  await notificationService.init();
+  await notificationService.requestPermissions();
 
   /// Dependency Injection
   final repo = AuthRepositoryImpl(UserDao());
