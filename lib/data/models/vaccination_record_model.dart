@@ -11,6 +11,7 @@ class VaccinationRecordModel extends VaccinationRecord {
     required super.location,
     required super.note,
     super.memberId,
+    super.isCompleted,
   });
 
   factory VaccinationRecordModel.fromMap(Map<String, dynamic> map) {
@@ -24,6 +25,7 @@ class VaccinationRecordModel extends VaccinationRecord {
       location: map['location'],
       note: map['note'],
       memberId: map['memberId'],
+      isCompleted: (map['isCompleted'] ?? 0) == 1,
     );
   }
 
@@ -38,6 +40,7 @@ class VaccinationRecordModel extends VaccinationRecord {
       'location': location,
       'note': note,
       'memberId': memberId,
+      'isCompleted': isCompleted ? 1 : 0,
     };
   }
 }

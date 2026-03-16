@@ -18,6 +18,7 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
         location: record.location,
         note: record.note,
         memberId: record.memberId,
+        isCompleted: record.isCompleted,
       ),
     );
   }
@@ -35,6 +36,7 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
         location: record.location,
         note: record.note,
         memberId: record.memberId,
+        isCompleted: record.isCompleted,
       ),
     );
   }

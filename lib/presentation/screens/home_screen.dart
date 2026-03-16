@@ -848,28 +848,54 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHistoryItem(VaccinationRecord r, DateTime today) {
-    final status = _calculateStatus(r, today);
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, AppRoutes.detail, arguments: r),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
-        ),
+    final status = r.calculateStatus(today);
+    final isDone = r.isCompleted;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => Navigator.pushNamed(context, AppRoutes.detail, arguments: r),
+        borderRadius: BorderRadius.circular(20),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _getStatusColor(status).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
+            // Checkbox for quick completion
+            InkWell(
+              onTap: () {
+                final vm = context.read<VaccinationViewModel>();
+                vm.update(VaccinationRecord(
+                  id: r.id,
+                  vaccineName: r.vaccineName,
+                  dose: r.dose,
+                  date: r.date,
+                  reminderDate: r.reminderDate,
+                  imagePath: r.imagePath,
+                  location: r.location,
+                  note: r.note,
+                  memberId: r.memberId,
+                  isCompleted: !r.isCompleted,
+                ));
+              },
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDone ? AppTheme.success.withOpacity(0.1) : Colors.grey.shade100,
+                  border: Border.all(color: isDone ? AppTheme.success : Colors.grey.shade300),
+                ),
+                child: Icon(
+                  isDone ? Icons.check : Icons.circle, 
+                  color: isDone ? AppTheme.success : Colors.grey.shade300, 
+                  size: 20
+                ),
               ),
-              child: Icon(Icons.vaccines, color: _getStatusColor(status), size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -882,29 +908,26 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Text(
                           r.vaccineName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F1F1F)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 16, 
+                            color: isDone ? Colors.grey : const Color(0xFF1F1F1F),
+                            decoration: isDone ? TextDecoration.lineThrough : null,
+                          ),
                         ),
                       ),
                       _buildStatusTag(status),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text("Vaxigrip Tetra", style: TextStyle(color: Color(0xFF828282), fontSize: 12)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_month, size: 14, color: Color(0xFF828282)),
-                      const SizedBox(width: 4),
-                      Text(DateFormat('dd/MM/yyyy').format(DateTime.parse(r.date)), style: const TextStyle(fontSize: 13, color: Color(0xFF828282))),
-                      const SizedBox(width: 16),
-                      const Icon(Icons.numbers, size: 14, color: Color(0xFF828282)),
-                      const SizedBox(width: 4),
-                      Text("Mũi ${r.dose}", style: const TextStyle(fontSize: 13, color: Color(0xFF828282))),
-                    ],
+                  Text(
+                    "Mũi ${r.dose} • ${DateFormat('dd/MM/yyyy').format(DateTime.parse(r.date))}",
+                    style: const TextStyle(color: Color(0xFF828282), fontSize: 12)
                   ),
                 ],
               ),
             ),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
           ],
         ),
       ),
@@ -938,6 +961,7 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (status) {
       case "Quá hạn": return AppTheme.danger;
       case "Sắp đến hạn": return AppTheme.warning;
+      case "Hôm nay": return Colors.orange;
       case "Đã tiêm": return AppTheme.success;
       default: return AppTheme.primary;
     }

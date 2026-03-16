@@ -260,15 +260,47 @@ class VaccinationDetailScreen extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context, VaccinationRecord record) {
+    final vm = context.read<VaccinationViewModel>();
+
     return Column(
       children: [
+        if (!record.isCompleted) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                vm.update(VaccinationRecord(
+                  id: record.id,
+                  vaccineName: record.vaccineName,
+                  dose: record.dose,
+                  date: record.date,
+                  reminderDate: record.reminderDate,
+                  imagePath: record.imagePath,
+                  location: record.location,
+                  note: record.note,
+                  memberId: record.memberId,
+                  isCompleted: true,
+                ));
+              },
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text("Xác nhận đã tiêm", style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.success,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         SizedBox(
           width: double.infinity,
           height: 52,
-          child: ElevatedButton(
+          child: OutlinedButton(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditRecordScreen(record: record))),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primary,
+              side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text("Chỉnh sửa thông tin", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -277,16 +309,13 @@ class VaccinationDetailScreen extends StatelessWidget {
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
-          height: 52,
-          child: OutlinedButton(
+          height: 44,
+          child: TextButton(
             onPressed: () => _showDeleteConfirmation(context, record),
-            style: OutlinedButton.styleFrom(
+            style: TextButton.styleFrom(
               foregroundColor: AppTheme.danger,
-              side: const BorderSide(color: Color(0xFFFFECEC)),
-              backgroundColor: const Color(0xFFFFECEC),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text("Xóa mũi tiêm", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Xóa mũi tiêm", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           ),
         ),
       ],

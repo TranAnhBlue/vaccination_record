@@ -33,7 +33,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: (db, version) async {
         await db.execute('''
         CREATE TABLE members(
@@ -58,6 +58,7 @@ class DatabaseHelper {
           location TEXT,
           note TEXT,
           memberId INTEGER,
+          isCompleted INTEGER DEFAULT 0,
           FOREIGN KEY (memberId) REFERENCES members (id) ON DELETE CASCADE
         )
         ''');
@@ -110,19 +111,12 @@ class DatabaseHelper {
             }
 
             // 3. Migrate existing records to a "Default" member for each user
-            // We need to find which user these records belong to.
-            // Since the old schema didn't have userId in vaccination_records, 
-            // we assume all existing records belong to the first user or only user.
-            // However, a better approach is to check if we can distinguish them.
-            // For now, to be safe, we create a default member for EACH user.
-            
             final users = await db.query('users');
             if (users.isNotEmpty) {
               for (var user in users) {
                 final userId = user['id'] as int;
                 final userName = user['name'] as String;
                 
-                // Check if default member already exists
                 final existingMembers = await db.query(
                   'members',
                   where: 'userId = ? AND relationship = ?',
@@ -142,7 +136,6 @@ class DatabaseHelper {
                   memberId = existingMembers.first['id'] as int;
                 }
 
-                // If this is the ONLY user, assign all orphaned records to them
                 if (users.length == 1) {
                   await db.update(
                     'vaccination_records',
@@ -150,8 +143,6 @@ class DatabaseHelper {
                     where: 'memberId IS NULL',
                   );
                 }
-                // If multiple users exist, it's ambiguous. 
-                // We'll assign records to the first user as a fallback if unknown.
                 else if (user == users.first) {
                   await db.update(
                     'vaccination_records',
@@ -163,6 +154,13 @@ class DatabaseHelper {
             }
           } catch (e) {
             debugPrint("Migration to version 6 failed: $e");
+          }
+        }
+        if (oldVersion < 7) {
+          try {
+            await db.execute('ALTER TABLE vaccination_records ADD COLUMN isCompleted INTEGER DEFAULT 0');
+          } catch (e) {
+            debugPrint("Column isCompleted might already exist: $e");
           }
         }
       },

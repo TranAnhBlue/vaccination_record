@@ -8,6 +8,7 @@ class VaccinationRecord {
   final String location;
   final String note;
   final int? memberId;
+  final bool isCompleted;
 
   VaccinationRecord({
     this.id,
@@ -19,28 +20,26 @@ class VaccinationRecord {
     required this.location,
     required this.note,
     this.memberId,
+    this.isCompleted = false,
   });
 
   String calculateStatus(DateTime today) {
+    if (isCompleted) return "Đã tiêm";
+
     final injectionDate = DateTime.tryParse(date);
-    if (injectionDate != null && injectionDate.isAfter(today)) {
-      final diff = injectionDate.difference(today).inDays;
-      if (diff < 3) return "Quá hạn";
-      return "Sắp đến hạn";
+    if (injectionDate != null) {
+      final injectionDay = DateTime(injectionDate.year, injectionDate.month, injectionDate.day);
+      
+      if (injectionDay.isAtSameMomentAs(today)) return "Hôm nay";
+      
+      if (injectionDay.isBefore(today)) return "Quá hạn";
+
+      final diff = injectionDay.difference(today).inDays;
+      if (diff <= 7) return "Sắp đến hạn";
+      return "Kế hoạch";
     }
 
-    if (reminderDate.isNotEmpty) {
-      final reminder = DateTime.tryParse(reminderDate);
-      if (reminder != null) {
-        if (reminder.isBefore(today)) return "Quá hạn";
-
-        final diff = reminder.difference(today).inDays;
-        if (diff < 3) return "Quá hạn";
-        if (diff < 7) return "Sắp đến hạn";
-      }
-    }
-
-    return "Đã tiêm";
+    return "Không xác định";
   }
 
   bool get isOverdue {
