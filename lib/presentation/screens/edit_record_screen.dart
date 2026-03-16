@@ -282,8 +282,7 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
       setState(() => _isLoading = true);
       try {
         final vm = context.read<VaccinationViewModel>();
-        await vm.update(VaccinationRecord(
-          id: widget.record.id,
+        await vm.update(widget.record.copyWith(
           vaccineName: nameController.text.trim(),
           dose: int.tryParse(doseController.text.trim()) ?? 1,
           date: DateFormat('yyyy-MM-dd').format(_injectionDate!),
@@ -291,7 +290,6 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
           location: locationController.text.trim(),
           note: reactionController.text.trim(),
           imagePath: _imageFile?.path ?? widget.record.imagePath,
-          memberId: widget.record.memberId,
         ));
         if (mounted) {
           setState(() {

@@ -270,18 +270,7 @@ class VaccinationDetailScreen extends StatelessWidget {
             height: 52,
             child: ElevatedButton.icon(
               onPressed: () {
-                vm.update(VaccinationRecord(
-                  id: record.id,
-                  vaccineName: record.vaccineName,
-                  dose: record.dose,
-                  date: record.date,
-                  reminderDate: record.reminderDate,
-                  imagePath: record.imagePath,
-                  location: record.location,
-                  note: record.note,
-                  memberId: record.memberId,
-                  isCompleted: true,
-                ));
+                vm.update(record.copyWith(isCompleted: true));
               },
               icon: const Icon(Icons.check_circle_outline),
               label: const Text("Xác nhận đã tiêm", style: TextStyle(fontWeight: FontWeight.bold)),
