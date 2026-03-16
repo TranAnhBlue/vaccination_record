@@ -23,6 +23,32 @@ class VaccinationRecord {
     this.isCompleted = false,
   });
 
+  VaccinationRecord copyWith({
+    int? id,
+    String? vaccineName,
+    int? dose,
+    String? date,
+    String? reminderDate,
+    String? imagePath,
+    String? location,
+    String? note,
+    int? memberId,
+    bool? isCompleted,
+  }) {
+    return VaccinationRecord(
+      id: id ?? this.id,
+      vaccineName: vaccineName ?? this.vaccineName,
+      dose: dose ?? this.dose,
+      date: date ?? this.date,
+      reminderDate: reminderDate ?? this.reminderDate,
+      imagePath: imagePath ?? this.imagePath,
+      location: location ?? this.location,
+      note: note ?? this.note,
+      memberId: memberId ?? this.memberId,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
+
   String calculateStatus(DateTime today) {
     if (isCompleted) return "Đã tiêm";
 

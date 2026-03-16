@@ -60,9 +60,15 @@ class VaccinationViewModel extends ChangeNotifier {
   }
 
   Future<void> add(VaccinationRecord record) async {
-    await repo.addRecord(record);
-    await NotificationService().scheduleVaccinationReminder(record);
-    await load(memberId: record.memberId);
+    try {
+      final id = await repo.addRecord(record);
+      final newRecord = record.copyWith(id: id);
+      await NotificationService().scheduleVaccinationReminder(newRecord);
+      await load(memberId: record.memberId);
+    } catch (e) {
+      debugPrint("Error adding record: $e");
+      rethrow;
+    }
   }
 
   Future<void> update(VaccinationRecord record) async {

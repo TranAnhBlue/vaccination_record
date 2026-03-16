@@ -888,18 +888,7 @@ class _HomeScreenState extends State<HomeScreen> {
             InkWell(
               onTap: () {
                 final vm = context.read<VaccinationViewModel>();
-                vm.update(VaccinationRecord(
-                  id: r.id,
-                  vaccineName: r.vaccineName,
-                  dose: r.dose,
-                  date: r.date,
-                  reminderDate: r.reminderDate,
-                  imagePath: r.imagePath,
-                  location: r.location,
-                  note: r.note,
-                  memberId: r.memberId,
-                  isCompleted: !r.isCompleted,
-                ));
+                vm.update(r.copyWith(isCompleted: !r.isCompleted));
               },
               child: Container(
                 padding: const EdgeInsets.all(4),
@@ -1132,7 +1121,7 @@ class _HomeScreenState extends State<HomeScreen> {
               "Đặt lịch\ntiêm chủng", 
               Icons.event_available_rounded, 
               Colors.green, 
-              () {} // Future feature
+              () => Navigator.pushNamed(context, AppRoutes.booking)
             ),
           ],
         ),

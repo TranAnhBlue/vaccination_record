@@ -13,4 +13,5 @@ class AppRoutes {
   static const addMember = "/add-member";
   static const editMember = "/edit-member";
   static const knowledge = "/knowledge";
+  static const booking = "/booking";
 }

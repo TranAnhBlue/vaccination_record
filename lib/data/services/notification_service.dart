@@ -43,37 +43,42 @@ class NotificationService {
   }
 
   Future<void> scheduleVaccinationReminder(VaccinationRecord record) async {
-    final reminderDate = DateTime.tryParse(record.reminderDate);
-    if (reminderDate == null) return;
+    try {
+      final reminderDate = DateTime.tryParse(record.reminderDate);
+      if (reminderDate == null) return;
 
-    // Schedule for 8:00 AM on the reminder date
-    final scheduledTime = tz.TZDateTime.from(
-      DateTime(reminderDate.year, reminderDate.month, reminderDate.day, 8, 0),
-      tz.local,
-    );
+      // Schedule for 8:00 AM on the reminder date
+      final scheduledTime = tz.TZDateTime.from(
+        DateTime(reminderDate.year, reminderDate.month, reminderDate.day, 8, 0),
+        tz.local,
+      );
 
-    if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) return;
+      if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) return;
 
-    await _notificationsPlugin.zonedSchedule(
-      record.id ?? record.hashCode,
-      'Nhắc lịch tiêm chủng: ${record.vaccineName}',
-      'Đến ngày tiêm mũi ${record.dose} theo lịch hẹn của bạn tại ${record.location}.',
-      scheduledTime,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'vaccination_reminders',
-          'Vaccination Reminders',
-          channelDescription: 'Notifications for scheduled vaccinations',
-          importance: Importance.max,
-          priority: Priority.high,
+      await _notificationsPlugin.zonedSchedule(
+        record.id ?? record.hashCode,
+        'Nhắc lịch tiêm chủng: ${record.vaccineName}',
+        'Đến ngày tiêm mũi ${record.dose} theo lịch hẹn của bạn tại ${record.location}.',
+        scheduledTime,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'vaccination_reminders',
+            'Vaccination Reminders',
+            channelDescription: 'Notifications for scheduled vaccinations',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: record.id?.toString(),
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: record.id?.toString(),
+      );
+    } catch (e) {
+      debugPrint("Error scheduling notification: $e");
+      // Don't rethrow, so we don't break the booking flow if only notifications fail
+    }
   }
 
   Future<void> cancelReminder(int id) async {

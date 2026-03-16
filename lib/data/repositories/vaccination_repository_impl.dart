@@ -7,8 +7,8 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
   final dao = VaccinationDao();
 
   @override
-  Future<void> addRecord(VaccinationRecord record) async {
-    await dao.insert(
+  Future<int> addRecord(VaccinationRecord record) async {
+    return await dao.insert(
       VaccinationRecordModel(
         vaccineName: record.vaccineName,
         dose: record.dose,

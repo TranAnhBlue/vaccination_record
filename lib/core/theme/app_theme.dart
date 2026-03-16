@@ -70,4 +70,11 @@ class AppTheme {
       ),
     ),
   );
+
+  static InputDecoration inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    );
+  }
 }

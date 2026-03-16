@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/vaccine_info.dart';
 import '../../../data/repositories/vaccine_info_repository.dart';
+import '../../../core/routes/app_routes.dart';
 
 class KnowledgeBaseScreen extends StatefulWidget {
   const KnowledgeBaseScreen({super.key});
@@ -138,6 +139,24 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           _buildDetailSection("Lịch tiêm:", vaccine.schedule),
           const SizedBox(height: 12),
           _buildDetailSection("Phản ứng phụ:", vaccine.sideEffects),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(
+                context, 
+                AppRoutes.booking, 
+                arguments: vaccine
+              ),
+              icon: const Icon(Icons.event_available, size: 18, color: Colors.white),
+              label: const Text("Đặt lịch tiêm ngay", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
         ],
       ),
     );

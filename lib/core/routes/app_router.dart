@@ -13,8 +13,10 @@ import '../../presentation/screens/change_password_screen.dart';
 import '../../presentation/screens/family/add_member_screen.dart';
 import '../../presentation/screens/family/edit_member_screen.dart';
 import '../../presentation/screens/knowledge/knowledge_base_screen.dart';
+import '../../presentation/screens/booking/booking_screen.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../domain/entities/member.dart';
+import '../../domain/entities/vaccine_info.dart';
 import 'app_routes.dart';
 
 Route<dynamic> generateRoute(RouteSettings settings) {
@@ -59,6 +61,10 @@ Route<dynamic> generateRoute(RouteSettings settings) {
 
     case AppRoutes.knowledge:
       return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
+
+    case AppRoutes.booking:
+      final vaccine = settings.arguments as VaccineInfo?;
+      return MaterialPageRoute(builder: (_) => BookingScreen(preSelectedVaccine: vaccine));
 
     default:
       return MaterialPageRoute(builder: (_) => const SplashScreen());
