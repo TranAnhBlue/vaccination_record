@@ -349,14 +349,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Sổ tiêm chủng gia đình,", style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 4),
-            Text(householdVm.selectedMember?.name ?? "Đang tải...", style: Theme.of(context).textTheme.displayMedium),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Sổ tiêm chủng gia đình,", style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 4),
+              Text(
+                householdVm.selectedMember?.name ?? "Đang tải...",
+                style: Theme.of(context).textTheme.displayMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 12),
         Row(
           children: [
             _buildIconButton(Icons.notifications_none),
@@ -568,12 +576,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
           ),
         ],
       ),
@@ -631,9 +641,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(r.vaccineName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F1F1F))),
+                Text(r.vaccineName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F1F1F)), maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
-                Text("Nhắc lại hàng năm • ${r.location}", style: const TextStyle(color: Color(0xFF828282), fontSize: 12)),
+                Text("Nhắc lại hàng năm • ${r.location}", style: const TextStyle(color: Color(0xFF828282), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),

@@ -168,11 +168,15 @@ class VaccinationDetailScreen extends StatelessWidget {
                     ],
                   ],
                 ),
-                Text(
-                  "Mũi ${record.dose} - ${record.vaccineName}",
-                  style: const TextStyle(
-                    color: Color(0xFF828282),
-                    fontSize: 13,
+                Flexible(
+                  child: Text(
+                    "Mũi ${record.dose} - ${record.vaccineName}",
+                    style: const TextStyle(
+                      color: Color(0xFF828282),
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
