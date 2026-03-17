@@ -118,7 +118,7 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: _relationship,
+                    value: _relationships.contains(_relationship) ? _relationship : _relationships.first,
                     isExpanded: true,
                     onChanged: (v) => setState(() => _relationship = v!),
                     items: _relationships.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),

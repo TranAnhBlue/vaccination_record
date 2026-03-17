@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../local/dao/user_dao.dart';
@@ -10,17 +9,12 @@ import '../../core/constants/hash_util.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final UserDao dao;
-
   AuthRepositoryImpl(this.dao);
 
   @override
   Future<User?> login(String phone, String password) async {
-    final hashed = HashUtil.hash(password);
-
-    final model = await dao.login(phone, hashed);
-
+    final model = await dao.login(phone, HashUtil.hash(password));
     if (model == null) return null;
-
     return User(
       id: model.id,
       name: model.name,
@@ -33,33 +27,34 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> register(User user) async {
+    // 1. Insert user with dob & gender
     final userId = await dao.insert(
       UserModel(
         name: user.name,
         phone: user.phone,
         password: HashUtil.hash(user.password),
+        dob: user.dob,
+        gender: user.gender,
       ),
     );
 
-    // Automatically create a default member for the new user
+    // 2. Auto-create "Chủ hộ" member — populate dob & gender immediately
     try {
       final memberDao = MemberDao();
       await memberDao.insert(MemberModel(
         userId: userId,
         name: user.name,
-        dob: "",
-        gender: "",
+        dob: user.dob,       // ← pass actual dob so suggestions work from day 1
+        gender: user.gender, // ← pass actual gender
         relationship: 'Chủ hộ',
       ));
     } catch (e) {
-      debugPrint("Failed to create default member on registration: $e");
+      debugPrint('Failed to create default member: $e');
     }
   }
 
   @override
-  Future<bool> isPhoneRegistered(String phone) async {
-    return dao.existsByPhone(phone);
-  }
+  Future<bool> isPhoneRegistered(String phone) => dao.existsByPhone(phone);
 
   @override
   Future<User?> getUserDetails(String phone) async {
@@ -79,13 +74,8 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<bool> changePassword(String phone, String oldPassword, String newPassword) async {
     final model = await dao.getUserByPhone(phone);
     if (model == null) return false;
-
-    final oldHashed = HashUtil.hash(oldPassword);
-    debugPrint("DEBUG_PASS: input_old=$oldPassword, hashed=$oldHashed, stored=${model.password}");
-    if (model.password != oldHashed) return false;
-
-    final newHashed = HashUtil.hash(newPassword);
-    await dao.updatePassword(phone, newHashed);
+    if (model.password != HashUtil.hash(oldPassword)) return false;
+    await dao.updatePassword(phone, HashUtil.hash(newPassword));
     return true;
   }
 

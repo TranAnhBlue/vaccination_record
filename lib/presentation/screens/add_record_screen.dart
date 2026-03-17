@@ -151,7 +151,7 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Member>(
-          value: _selectedMember,
+          value: householdVm.members.contains(_selectedMember) ? _selectedMember : null,
           isExpanded: true,
           hint: const Text("Chọn thành viên"),
           onChanged: (m) => setState(() => _selectedMember = m),

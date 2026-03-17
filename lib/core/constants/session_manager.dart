@@ -20,6 +20,8 @@ class SessionManager {
     return pref.getBool(keyLogin) ?? false;
   }
 
+  static Future<void> clearLogin() => logout();
+
   static Future<void> logout() async {
     final pref = await SharedPreferences.getInstance();
     await pref.clear();
