@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-
-import '../../domain/entities/vaccination_record.dart';
-import '../viewmodels/vaccination_viewmodel.dart';
-import '../viewmodels/household_viewmodel.dart';
-import '../viewmodels/settings_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
+import '../viewmodels/appointment_viewmodel.dart';
+import '../viewmodels/household_viewmodel.dart';
+import '../viewmodels/auth_viewmodel.dart';
+import 'booking/booking_screen.dart';
 
 class ReminderScreen extends StatefulWidget {
   final VoidCallback? onSeeAll;
@@ -16,355 +15,377 @@ class ReminderScreen extends StatefulWidget {
   State<ReminderScreen> createState() => _ReminderScreenState();
 }
 
-class _ReminderScreenState extends State<ReminderScreen> {
+class _ReminderScreenState extends State<ReminderScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
+  }
+
+  void _reload() {
+    final authVm = context.read<AuthViewModel>();
+    if (authVm.currentUser?.id != null) {
+      context.read<AppointmentViewModel>().load(userId: authVm.currentUser!.id);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<VaccinationViewModel>();
-    final householdVm = context.watch<HouseholdViewModel>();
+    final apptVm = context.watch<AppointmentViewModel>();
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    /// ===== FILTER UPCOMING =====
-    final upcoming = vm.records.where((r) {
-      final status = _calculateStatus(r, today);
-      return status == "Hôm nay" ||
-          status == "Sắp đến hạn" ||
-          status == "Sắp tới";
-    }).toList();
-
-    /// ===== SORT BY REMINDER DATE =====
-    upcoming.sort((a, b) {
-      final dateA =
-          DateTime.tryParse(a.reminderDate) ?? DateTime(9999);
-      final dateB =
-          DateTime.tryParse(b.reminderDate) ?? DateTime(9999);
-      return dateA.compareTo(dateB);
-    });
-
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: const Text("Lịch hẹn"),
-        automaticallyImplyLeading: false,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildGeneralSettings(context),
-            const SizedBox(height: 32),
-
-            /// HEADER
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Lịch tiêm sắp tới",
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                if (upcoming.length > 3)
-                  TextButton(
-                    onPressed: widget.onSeeAll,
-                    child: const Text(
-                      "Xem tất cả",
-                      style: TextStyle(
+    return Column(
+      children: [
+        // ── Header ────────────────────────────────────────────────────────
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Lịch hẹn tiêm chủng',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const BookingScreen()),
+                    ).then((_) => _reload()),
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
                         color: AppTheme.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: const Icon(Icons.add, color: Colors.white, size: 20),
                     ),
                   ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            if (upcoming.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Text(
-                    "Hôm nay chưa có lịch tiêm mới",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              )
-            else
-              ...upcoming.map(
-                    (r) => _buildReminderCard(context, r, today, householdVm),
+                ],
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// ================= SETTINGS =================
-  Widget _buildGeneralSettings(BuildContext context) {
-    final settingsVm = context.watch<SettingsViewModel>();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Cài đặt chung",
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF828282)),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+              const SizedBox(height: 16),
+              TabBar(
+                controller: _tabController,
+                labelColor: AppTheme.primary,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: AppTheme.primary,
+                indicatorSize: TabBarIndicatorSize.label,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                tabs: [
+                  Tab(text: 'Sắp tới (${apptVm.upcoming.length})'),
+                  Tab(text: 'Đã qua (${apptVm.past.length})'),
+                ],
               ),
             ],
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F7FF),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.notifications_active,
-                    color: AppTheme.primary),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+
+        // ── Content ───────────────────────────────────────────────────────
+        Expanded(
+          child: apptVm.loading
+              ? const Center(child: CircularProgressIndicator())
+              : TabBarView(
+                  controller: _tabController,
                   children: [
-                    Text("Thông báo ứng dụng",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15)),
-                    Text(
-                      "Nhận thông báo đẩy trên điện thoại",
-                      style: TextStyle(
-                          color: Color(0xFF828282), fontSize: 12),
-                    ),
+                    _buildList(apptVm.upcoming, isPast: false),
+                    _buildList(apptVm.past, isPast: true),
                   ],
                 ),
-              ),
-              Switch(
-                value: settingsVm.notificationsEnabled,
-                onChanged: (val) => settingsVm.setNotificationsEnabled(val),
-                activeColor: Colors.white,
-                activeTrackColor: AppTheme.primary,
-              ),
-            ],
-          ),
         ),
       ],
     );
   }
 
-  /// ================= CARD =================
-  Widget _buildReminderCard(BuildContext context,
-      VaccinationRecord r,
-      DateTime today,
-      HouseholdViewModel householdVm) {
-    final reminderDate = DateTime.tryParse(r.reminderDate);
-    final status = _calculateStatus(r, today);
-    final memberName = r.memberId != null
-        ? householdVm.members.where((m) => m.id == r.memberId).map((m) => m.name).firstOrNull
-        : null;
-
-    Color statusColor;
-    switch (status) {
-      case "Quá hạn":
-        statusColor = AppTheme.danger;
-        break;
-      case "Sắp đến hạn":
-        statusColor = AppTheme.warning;
-        break;
-      case "Hôm nay":
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = AppTheme.primary;
+  Widget _buildList(List appointments, {required bool isPast}) {
+    if (appointments.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isPast ? Icons.history : Icons.event_available,
+              size: 80,
+              color: Colors.grey.shade200,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isPast ? 'Chưa có lịch hẹn nào đã qua' : 'Chưa có lịch hẹn sắp tới',
+              style: const TextStyle(color: Colors.grey, fontSize: 15),
+            ),
+            if (!isPast) ...[
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BookingScreen()),
+                ).then((_) => _reload()),
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text('Đặt lịch ngay'),
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+              ),
+            ],
+          ],
+        ),
+      );
     }
 
-    final displayDate =
-        reminderDate ?? DateTime.tryParse(r.date);
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: appointments.length,
+      itemBuilder: (context, i) => _buildAppointmentCard(appointments[i], isPast: isPast),
+    );
+  }
 
-    final diff =
-        displayDate
-            ?.difference(today)
-            .inDays ?? 0;
+  Widget _buildAppointmentCard(dynamic appt, {required bool isPast}) {
+    final date = DateTime.tryParse(appt.appointmentDate);
+    final now = DateTime.now();
+    final isToday = date != null &&
+        date.year == now.year && date.month == now.month && date.day == now.day;
+    final isOverdue = date != null && date.isBefore(now) && appt.status == 'pending';
+
+    Color statusColor;
+    String statusLabel;
+    IconData statusIcon;
+
+    switch (appt.status) {
+      case 'completed':
+        statusColor = AppTheme.success;
+        statusLabel = 'Đã hoàn thành';
+        statusIcon = Icons.check_circle;
+        break;
+      case 'cancelled':
+        statusColor = Colors.grey;
+        statusLabel = 'Đã huỷ';
+        statusIcon = Icons.cancel;
+        break;
+      default:
+        if (isOverdue) {
+          statusColor = AppTheme.danger;
+          statusLabel = 'Quá hạn';
+          statusIcon = Icons.error;
+        } else if (isToday) {
+          statusColor = Colors.orange;
+          statusLabel = 'Hôm nay';
+          statusIcon = Icons.today;
+        } else {
+          statusColor = AppTheme.primary;
+          statusLabel = 'Đã đặt';
+          statusIcon = Icons.event;
+        }
+    }
+
+    final hVm = context.read<HouseholdViewModel>();
+    final member = hVm.members.where((m) => m.id == appt.memberId).firstOrNull;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade100),
+        borderRadius: BorderRadius.circular(20),
+        border: isToday ? Border.all(color: Colors.orange.withOpacity(0.4), width: 1.5)
+            : isOverdue ? Border.all(color: AppTheme.danger.withOpacity(0.3), width: 1.5)
+            : null,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (memberName != null) ...[
-            Row(
+          // ── Top Row ─────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
               children: [
-                CircleAvatar(
-                  radius: 10,
-                  backgroundColor: AppTheme.primary.withOpacity(0.15),
-                  child: Text(memberName[0], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                // Date box
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        date != null ? date.day.toString() : '--',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: statusColor),
+                      ),
+                      Text(
+                        date != null ? 'Th${date.month}' : '--',
+                        style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 6),
-                Text(memberName, style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(appt.vaccineName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(statusIcon, size: 11, color: statusColor),
+                                const SizedBox(width: 3),
+                                Text(statusLabel,
+                                    style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 12, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(appt.appointmentTime,
+                              style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          const SizedBox(width: 12),
+                          const Icon(Icons.location_on_outlined, size: 12, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(appt.center,
+                                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
+                      ),
+                      if (member != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.person_outline, size: 12, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text('${member.name} · ${member.relationship}',
+                                style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-          ],
+          ),
 
-          /// STATUS
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                      color: statusColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold),
-                ),
+          // ── Note ──────────────────────────────────────────────────────
+          if (appt.note.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
               ),
-              Icon(Icons.vaccines,
-                  color: statusColor, size: 24),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          Text(
-            "${r.vaccineName} (Mũi ${r.dose})",
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              const Icon(Icons.calendar_today,
-                  size: 14, color: Color(0xFF828282)),
-              const SizedBox(width: 8),
-              if (displayDate != null)
-                Text(
-                  diff == 0
-                      ? "Hôm nay, ${DateFormat('dd/MM/yyyy').format(
-                      displayDate)}"
-                      : diff < 0
-                      ? "${DateFormat('dd/MM/yyyy').format(
-                      displayDate)} (Quá ${diff.abs()} ngày)"
-                      : "${DateFormat('dd/MM/yyyy').format(
-                      displayDate)} (Còn $diff ngày)",
-                  style: const TextStyle(
-                      color: Color(0xFF828282),
-                      fontSize: 13),
-                )
-              else
-                const Text("Chưa xác định ngày"),
-            ],
-          ),
-
-          const SizedBox(height: 4),
-
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 14, color: Color(0xFF828282)),
-              const SizedBox(width: 8),
-              Text(r.location,
-                  style: const TextStyle(
-                      color: Color(0xFF828282),
-                      fontSize: 13)),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton(
-              onPressed: () =>
-                  Navigator.pushNamed(
-                      context, "/detail",
-                      arguments: r),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                "Chi tiết",
-                style: TextStyle(
-                    fontWeight: FontWeight.bold),
+              child: Row(
+                children: [
+                  const Icon(Icons.notes, size: 14, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(appt.note,
+                        style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                  ),
+                ],
               ),
             ),
+
+          // ── Actions ───────────────────────────────────────────────────
+          if (appt.status == 'pending')
+            Container(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.grey.shade100)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () => _confirmComplete(appt.id),
+                      icon: const Icon(Icons.check_circle_outline, size: 16, color: AppTheme.success),
+                      label: const Text('Đã tiêm', style: TextStyle(color: AppTheme.success, fontSize: 13)),
+                    ),
+                  ),
+                  Container(width: 1, height: 24, color: Colors.grey.shade200),
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () => _confirmCancel(appt.id, appt.vaccineName),
+                      icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.grey),
+                      label: const Text('Huỷ lịch', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmComplete(int id) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Xác nhận đã tiêm?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Bạn xác nhận đã thực hiện mũi tiêm này thành công?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Huỷ')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<AppointmentViewModel>().completeAppointment(id);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+            child: const Text('Xác nhận', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  /// ================= STATUS LOGIC =================
-  String _calculateStatus(VaccinationRecord r,
-      DateTime today,) {
-    if (r.reminderDate.isEmpty) {
-      return "Đã tiêm";
-    }
-
-    DateTime? reminder;
-
-    /// ✅ parse dd/MM/yyyy
-    try {
-      reminder = DateFormat('dd/MM/yyyy')
-          .parseStrict(r.reminderDate);
-    } catch (_) {
-      reminder = DateTime.tryParse(r.reminderDate);
-    }
-
-    if (reminder == null) {
-      return "Đã tiêm";
-    }
-
-    final reminderDay =
-    DateTime(reminder.year, reminder.month, reminder.day);
-
-    final diff = reminderDay
-        .difference(today)
-        .inDays;
-
-    if (diff < 0) return "Quá hạn";
-    if (diff == 0) return "Hôm nay";
-    if (diff <= 3) return "Sắp đến hạn";
-
-    return "Sắp tới";
+  void _confirmCancel(int id, String vaccineName) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Huỷ lịch hẹn?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Bạn có chắc muốn huỷ lịch tiêm $vaccineName?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Không')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<AppointmentViewModel>().cancelAppointment(id);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+            child: const Text('Huỷ lịch', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }

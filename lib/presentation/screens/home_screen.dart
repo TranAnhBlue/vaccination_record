@@ -13,6 +13,7 @@ import 'profile_screen.dart';
 import 'ai/ai_screen.dart';
 import '../viewmodels/household_viewmodel.dart';
 import 'suggestions_screen.dart';
+import '../viewmodels/appointment_viewmodel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,8 +42,12 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.microtask(() {
       final authVm = context.read<AuthViewModel>();
       if (authVm.currentUser != null) {
+        context.read<AppointmentViewModel>().load(userId: authVm.currentUser!.id);
         context.read<HouseholdViewModel>().loadMembers(authVm.currentUser!.id!).then((_) {
           final householdVm = context.read<HouseholdViewModel>();
+          final memberIds = householdVm.members.map((m) => m.id).whereType<int>().toList();
+          // Preload tất cả records vào cache (cho suggestions screen)
+          context.read<VaccinationViewModel>().loadAllForMembers(memberIds);
           if (householdVm.selectedMember != null) {
             context.read<VaccinationViewModel>().load(memberId: householdVm.selectedMember!.id).then((_) {
               _fetchAIInsights();
@@ -138,6 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildQuickStats(upcomingCount, overdue, nextRecord),
             const SizedBox(height: 24),
             _buildFamilyOverviewCard(householdVm),
+            const SizedBox(height: 24),
+            _buildAppointmentSummary(),
             const SizedBox(height: 32),
             _buildSectionHeader("Lời nhắc tiêm chủng", "Xem lịch", onTap: () => setState(() => _currentIndex = 3)),
             const SizedBox(height: 16),
@@ -165,7 +172,62 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFamilyOverviewCard(HouseholdViewModel householdVm) {
+  Widget _buildAppointmentSummary() {
+    final apptVm = context.read<AppointmentViewModel>();
+    final upcoming = apptVm.upcoming;
+    if (upcoming.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event_available, color: Colors.orange, size: 20),
+              const SizedBox(width: 8),
+              const Text("Lịch hẹn sắp tới", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => setState(() => _currentIndex = 3),
+                child: const Text("Xem tất cả", style: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...upcoming.take(2).map((a) {
+            final d = DateTime.tryParse(a.appointmentDate);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(d != null ? d.day.toString() : '--', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.orange)),
+                      Text(d != null ? 'Th\${d.month}' : '--', style: const TextStyle(fontSize: 9, color: Colors.orange, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(a.vaccineName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('\${a.appointmentTime} · \${a.center}', style: const TextStyle(color: Colors.grey, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ])),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+    Widget _buildFamilyOverviewCard(HouseholdViewModel householdVm) {
     if (householdVm.members.length <= 1) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.all(20),

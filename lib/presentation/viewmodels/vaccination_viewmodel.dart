@@ -8,55 +8,33 @@ class VaccinationViewModel extends ChangeNotifier {
   final repo = VaccinationRepositoryImpl();
 
   List<VaccinationRecord> records = [];
+  // Cache: memberId → records (cho suggestions screen)
+  final Map<int, List<VaccinationRecord>> _cache = {};
+  bool isLoading = false;
 
   Future<void> load({int? memberId}) async {
+    isLoading = true;
+    notifyListeners();
     records = await repo.getRecords(memberId: memberId);
-    if (records.isEmpty && memberId != null) { 
-      // check if this is the first time loading for this member
-      // we could check a flag, but for now let's just seed if empty for any member initially
-      // await seedDemoData(memberId);
-      // records = await repo.getRecords(memberId: memberId);
+    if (memberId != null) {
+      _cache[memberId] = List.from(records);
+    }
+    isLoading = false;
+    notifyListeners();
+  }
+
+  /// Load tất cả records của 1 user (qua danh sách memberIds)
+  Future<void> loadAllForMembers(List<int> memberIds) async {
+    for (final id in memberIds) {
+      final list = await repo.getRecords(memberId: id);
+      _cache[id] = list;
     }
     notifyListeners();
   }
 
-  Future<void> seedDemoData(int memberId) async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    final samples = [
-      VaccinationRecord(
-        vaccineName: "Vắc xin 6 trong 1 (Hexaxim)",
-        dose: 1,
-        date: DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 30))),
-        reminderDate: DateFormat('yyyy-MM-dd').format(today.add(const Duration(days: 1))),
-        location: "VNVC Đà Nẵng",
-        note: "Tiêm nhắc lại đúng hạn",
-        memberId: memberId,
-      ),
-      VaccinationRecord(
-        vaccineName: "Vắc xin Phế cầu (Prevenar 13)",
-        dose: 1,
-        date: DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 60))),
-        reminderDate: DateFormat('yyyy-MM-dd').format(today.add(const Duration(days: 8))),
-        location: "Trung tâm Y tế Quận 1",
-        note: "Theo dõi phản ứng nhẹ",
-        memberId: memberId,
-      ),
-      VaccinationRecord(
-        vaccineName: "Vắc xin Cúm (Vaxigrip Tetra)",
-        dose: 1,
-        date: DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 365))),
-        reminderDate: DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 5))), // This will be Overdue
-        location: "Trạm y tế Phường",
-        note: "Nên tiêm nhắc hàng năm",
-        memberId: memberId,
-      ),
-    ];
-
-    for (var r in samples) {
-      await repo.addRecord(r);
-    }
+  /// Lấy records của 1 member (từ cache hoặc load mới)
+  List<VaccinationRecord> recordsForMember(int memberId) {
+    return _cache[memberId] ?? [];
   }
 
   Future<void> add(VaccinationRecord record) async {
@@ -65,8 +43,12 @@ class VaccinationViewModel extends ChangeNotifier {
       final newRecord = record.copyWith(id: id);
       await NotificationService().scheduleVaccinationReminder(newRecord);
       await load(memberId: record.memberId);
+      // Cập nhật cache
+      if (record.memberId != null) {
+        _cache[record.memberId!] = List.from(records);
+      }
     } catch (e) {
-      debugPrint("Error adding record: $e");
+      debugPrint('Error adding record: $e');
       rethrow;
     }
   }
@@ -75,27 +57,17 @@ class VaccinationViewModel extends ChangeNotifier {
     await repo.updateRecord(record);
     await NotificationService().scheduleVaccinationReminder(record);
     await load(memberId: record.memberId);
+    if (record.memberId != null) {
+      _cache[record.memberId!] = List.from(records);
+    }
   }
 
   Future<void> delete(int id, {int? memberId}) async {
     await repo.deleteRecord(id);
     await NotificationService().cancelReminder(id);
     await load(memberId: memberId);
-  }
-
-  List<VaccinationRecord> get filteredRecords {
-    // Basic filtering logic based on dates
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    return records.where((r) {
-      if (r.reminderDate.isEmpty) return true; // Default if no reminder
-
-      final reminder = DateTime.tryParse(r.reminderDate);
-      if (reminder == null) return true;
-
-      // This logic will be refined in the UI
-      return true; 
-    }).toList();
+    if (memberId != null) {
+      _cache[memberId] = List.from(records);
+    }
   }
 }
