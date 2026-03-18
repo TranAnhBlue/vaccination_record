@@ -268,11 +268,9 @@ class VaccineSuggestionService {
       Member member, List<VaccinationRecord> records) {
     final ageMonths = _ageInMonths(member.dob);
 
-    // Lọc vaccine phù hợp độ tuổi
+    // Lọc vaccine: Tất cả những mũi ĐÁNG LẼ phải tiêm từ lúc sinh đến tuổi hiện tại (Tích lũy)
     final ageAppropriate = _schedule.where((v) {
-      if (ageMonths < v.minAgeMonths) return false;
-      if (v.maxAgeMonths != -1 && ageMonths > v.maxAgeMonths + 6) return false;
-      return true;
+      return ageMonths >= v.minAgeMonths;
     }).toList();
 
     // Gắn trạng thái cho từng vaccine
