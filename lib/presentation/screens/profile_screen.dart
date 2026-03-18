@@ -183,12 +183,22 @@ class ProfileScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 42,
-            backgroundColor: Colors.white,
+            backgroundColor: Colors.white.withOpacity(0.22),
             child: CircleAvatar(
               radius: 39,
-              backgroundImage: NetworkImage("https://i.pravatar.cc/150?u=anh"),
+              backgroundColor: Colors.white,
+              child: Text(
+                (name != null && name.trim().isNotEmpty)
+                    ? name.trim()[0].toUpperCase()
+                    : "?",
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primary,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),

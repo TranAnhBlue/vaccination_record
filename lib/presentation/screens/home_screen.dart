@@ -284,13 +284,17 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _buildTopIconButton(Icons.notifications_none),
               const SizedBox(height: 12),
-              const CircleAvatar(
-                radius: 22,
-                backgroundColor: Colors.white,
-                child: CircleAvatar(
-                  radius: 20,
-                  backgroundImage:
-                  NetworkImage("https://i.pravatar.cc/150?u=family"),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppTheme.primary.withOpacity(0.12),
+                child: Text(
+                  (householdVm.selectedMember?.name.isNotEmpty == true)
+                      ? householdVm.selectedMember!.name[0].toUpperCase()
+                      : "?",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primary,
+                  ),
                 ),
               ),
             ],
