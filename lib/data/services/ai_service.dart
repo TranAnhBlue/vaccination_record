@@ -58,10 +58,16 @@ class AIService {
     } on InvalidApiKey {
       yield '❌ API key không hợp lệ. Vui lòng vào Hồ sơ → Cài đặt AI để nhập API key mới.';
     } on ServerException catch (e) {
-      yield '❌ Lỗi máy chủ: ${e.message}. Vui lòng thử lại.';
+      if (e.message.contains('quota') || e.message.contains('429')) {
+        yield '❌ Giới hạn AI đã hết (Quota exceeded). Vui lòng thử lại sau ít phút hoặc nhập API key cá nhân của bạn để sử dụng ổn định hơn.';
+      } else {
+        yield '❌ Lỗi máy chủ: ${e.message}. Vui lòng thử lại.';
+      }
     } catch (e) {
       final msg = e.toString().toLowerCase();
-      if (msg.contains('api_key') || msg.contains('apikey') || msg.contains('unauthorized') || msg.contains('403')) {
+      if (msg.contains('quota') || msg.contains('429')) {
+        yield '❌ Bạn đã hết lượt sử dụng AI miễn phí (Quota exceeded). Vui lòng thử lại sau 1-2 phút hoặc dùng API key riêng.';
+      } else if (msg.contains('api_key') || msg.contains('apikey') || msg.contains('unauthorized') || msg.contains('403')) {
         yield '❌ API key không hợp lệ. Vào Hồ sơ → Cài đặt AI để nhập key mới.';
       } else if (msg.contains('network') || msg.contains('socketexception') || msg.contains('timeout')) {
         yield '📡 Không có kết nối mạng. Kiểm tra internet và thử lại.';
