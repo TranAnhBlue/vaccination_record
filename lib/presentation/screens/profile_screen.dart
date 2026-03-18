@@ -245,18 +245,23 @@ class ProfileScreen extends StatelessWidget {
 
   Future<void> _showDatePicker(BuildContext context, String initialValue, Function(String) onSave) async {
     DateTime initialDate;
+
     try {
-      if (initialValue.isNotEmpty && initialValue.contains('/')) {
-        final parts = initialValue.split('/');
-        initialDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+      if (initialValue.isNotEmpty) {
+        if (initialValue.contains('/')) {
+          initialDate = DateFormat('dd/MM/yyyy').parseStrict(initialValue);
+        } else if (initialValue.contains('-')) {
+          initialDate = DateTime.parse(initialValue);
+        } else {
+          initialDate = DateTime(2000, 1, 1);
+        }
       } else {
         initialDate = DateTime(2000, 1, 1);
       }
-    } catch (e) {
+    } catch (_) {
       initialDate = DateTime(2000, 1, 1);
     }
-    
-    // Ensure initialDate is not in the future
+
     if (initialDate.isAfter(DateTime.now())) {
       initialDate = DateTime.now();
     }

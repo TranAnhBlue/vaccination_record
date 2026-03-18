@@ -2,10 +2,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AIConfig {
   static const String _apiKeyPref = 'gemini_api_key';
-  static const String defaultModel = 'gemini-1.5-flash';
+  static const String defaultModel = 'gemini-2.0-flash';
 
   // Fallback key (may be expired — users should set their own)
-  static const String _fallbackKey = 'AIzaSyBtjdHjEOK1CLnpHXAkChOhUPv1C6uWsxI';
+  static const String _fallbackKey = 'AIzaSyCaUyKQKZfm_LDTkrBYZG3l_Z9pCiMnXB4';
 
   static Future<String> getApiKey() async {
     final prefs = await SharedPreferences.getInstance();
