@@ -11,7 +11,19 @@ class AppointmentViewModel extends ChangeNotifier {
   bool loading = false;
   String? error;
 
+  Map<String, int?>? _lastLoadParams;
+
+  Future<void> _reload() async {
+    if (_lastLoadParams != null) {
+      await load(
+        memberId: _lastLoadParams!['memberId'],
+        userId: _lastLoadParams!['userId'],
+      );
+    }
+  }
+
   Future<void> load({int? memberId, int? userId}) async {
+    _lastLoadParams = {'memberId': memberId, 'userId': userId};
     loading = true;
     error = null;
     notifyListeners();
@@ -21,6 +33,8 @@ class AppointmentViewModel extends ChangeNotifier {
       } else if (memberId != null) {
         appointments = await _dao.getByMember(memberId);
       }
+      // Force a new list reference for better reactivity
+      appointments = List.from(appointments);
     } catch (e) {
       error = 'Không thể tải lịch hẹn: $e';
     }
@@ -51,8 +65,7 @@ class AppointmentViewModel extends ChangeNotifier {
         createdAt: DateTime.now().toIso8601String(),
       );
       await _dao.insert(model);
-      loading = false;
-      notifyListeners();
+      await _reload();
       return true;
     } catch (e) {
       loading = false;
@@ -64,11 +77,15 @@ class AppointmentViewModel extends ChangeNotifier {
 
   Future<void> cancelAppointment(int id) async {
     await _dao.updateStatus(id, 'cancelled');
+    // Force immediate local update for responsiveness
     final idx = appointments.indexWhere((a) => a.id == id);
     if (idx >= 0) {
       appointments[idx] = appointments[idx].copyWith(status: 'cancelled');
+      appointments = List.from(appointments);
       notifyListeners();
     }
+    // Then reload from DB to be 100% sure
+    await _reload();
   }
 
   Future<void> completeAppointment(int id) async {
@@ -76,14 +93,15 @@ class AppointmentViewModel extends ChangeNotifier {
     final idx = appointments.indexWhere((a) => a.id == id);
     if (idx >= 0) {
       appointments[idx] = appointments[idx].copyWith(status: 'completed');
+      appointments = List.from(appointments);
       notifyListeners();
     }
+    await _reload();
   }
 
   Future<void> deleteAppointment(int id) async {
     await _dao.delete(id);
-    appointments.removeWhere((a) => a.id == id);
-    notifyListeners();
+    await _reload();
   }
 
   List<Appointment> get pending =>

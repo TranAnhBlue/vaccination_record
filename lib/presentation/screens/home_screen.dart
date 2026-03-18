@@ -13,6 +13,7 @@ import 'profile_screen.dart';
 import 'ai/ai_screen.dart';
 import '../viewmodels/household_viewmodel.dart';
 import 'suggestions_screen.dart';
+import '../../domain/services/vaccine_suggestion_service.dart';
 import '../viewmodels/appointment_viewmodel.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -119,6 +120,17 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    final suggestionService = VaccineSuggestionService();
+    int recommended = 0;
+    int extraCount = 0;
+    if (householdVm.selectedMember != null) {
+      final memberRecords = vm.recordsForMember(householdVm.selectedMember!.id!);
+      final suggestions = suggestionService.getSuggestionsForMember(householdVm.selectedMember!, memberRecords);
+      recommended = suggestions.vaccines.length;
+      extraCount = suggestions.extraCount;
+    }
+    if (recommended == 0) recommended = 14; // Fallback
+
     return Expanded(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -130,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMemberSwitcher(householdVm),
             const SizedBox(height: 24),
             _buildUrgentWarning(vm.records, today),
-            _buildHealthStatusCard(completedCount),
+            _buildHealthStatusCard(completedCount, recommended, extraCount),
             const SizedBox(height: 24),
 
             // --- AI INSIGHT SECTION ---
@@ -447,10 +459,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHealthStatusCard(int completed) {
-    // Logic: If completed >= 14 (recommended), it's 100%.
-    int recommended = 14;
-    double percent = (completed / recommended).clamp(0, 1) * 100;
+  Widget _buildHealthStatusCard(int completed, int recommended, int extra) {
+    // Logic: If completed >= recommended, it's 100%.
+    double percent = recommended > 0 ? (completed / recommended).clamp(0, 1) * 100 : 0;
     
     return Container(
       width: double.infinity,
@@ -545,6 +556,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 32),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
                     "$completed",
@@ -555,14 +567,32 @@ class _HomeScreenState extends State<HomeScreen> {
                       letterSpacing: 1,
                     ),
                   ),
-                  const Text(
-                    " / 14",
-                    style: TextStyle(
+                  Text(
+                    " / $recommended",
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  if (extra > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        "+$extra mũi tự nguyện",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const Text(

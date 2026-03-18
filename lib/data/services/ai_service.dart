@@ -57,18 +57,25 @@ class AIService {
       }
     } on InvalidApiKey {
       yield '❌ API key không hợp lệ. Vui lòng vào Hồ sơ → Cài đặt AI để nhập API key mới.';
+    } on UnsupportedUserLocation {
+      yield '🌍 Gemini AI chưa hỗ trợ vùng của bạn. Vui lòng thử dùng VPN hoặc kiểm tra lại tài khoản Google AI.';
     } on ServerException catch (e) {
-      if (e.message.contains('quota') || e.message.contains('429')) {
-        yield '❌ Giới hạn AI đã hết (Quota exceeded). Vui lòng thử lại sau ít phút hoặc nhập API key cá nhân của bạn để sử dụng ổn định hơn.';
+      final err = e.message.toLowerCase();
+      if (err.contains('quota') || err.contains('429')) {
+        yield '❌ Giới hạn AI đã hết (Quota exceeded). Thử lại sau 1 phút hoặc dùng API key cá nhân.';
+      } else if (err.contains('not found') || err.contains('unsupported')) {
+        yield '⚠️ Model "${AIConfig.model}" không tìm thấy hoặc chưa được hỗ trợ cho API Key này. Hãy thử quay lại gemini-pro.';
       } else {
         yield '❌ Lỗi máy chủ: ${e.message}. Vui lòng thử lại.';
       }
     } catch (e) {
       final msg = e.toString().toLowerCase();
       if (msg.contains('quota') || msg.contains('429')) {
-        yield '❌ Bạn đã hết lượt sử dụng AI miễn phí (Quota exceeded). Vui lòng thử lại sau 1-2 phút hoặc dùng API key riêng.';
+        yield '❌ Bạn đã hết lượt sử dụng AI miễn phí (Quota exceeded). Thử lại sau 1-2 phút.';
+      } else if (msg.contains('not_found') || msg.contains('404')) {
+        yield '⚠️ Lỗi: Không tìm thấy model AI phù hợp. Hãy kiểm tra API key hoặc đổi sang gemini-pro.';
       } else if (msg.contains('api_key') || msg.contains('apikey') || msg.contains('unauthorized') || msg.contains('403')) {
-        yield '❌ API key không hợp lệ. Vào Hồ sơ → Cài đặt AI để nhập key mới.';
+        yield '❌ API key không hợp lệ hoặc không có quyền truy cập model này.';
       } else if (msg.contains('network') || msg.contains('socketexception') || msg.contains('timeout')) {
         yield '📡 Không có kết nối mạng. Kiểm tra internet và thử lại.';
       } else {

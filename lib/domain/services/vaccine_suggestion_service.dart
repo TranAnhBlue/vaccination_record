@@ -31,11 +31,13 @@ class MemberVaccineSuggestion {
   final Member member;
   final int ageMonths;
   final List<SuggestedVaccineStatus> vaccines;
+  final int extraCount;
 
   MemberVaccineSuggestion({
     required this.member,
     required this.ageMonths,
     required this.vaccines,
+    this.extraCount = 0,
   });
 
   int get doneCount => vaccines.where((v) => v.status == VaccineStatus.done).length;
@@ -298,21 +300,37 @@ class VaccineSuggestionService {
       return order[a.status]!.compareTo(order[b.status]!);
     });
 
+    // Đếm các bản ghi "ngoài danh sách" (không khớp với bất kỳ vaccine nào trong _schedule)
+    final matchedRecordIds = statuses
+        .where((s) => s.record != null)
+        .map((s) => s.record!.id)
+        .toSet();
+    
+    final extraCount = records
+        .where((r) => r.isCompleted && !matchedRecordIds.contains(r.id))
+        .length;
+
     return MemberVaccineSuggestion(
       member: member,
       ageMonths: ageMonths,
       vaccines: statuses,
+      extraCount: extraCount,
     );
   }
 
   // ── HELPERS ───────────────────────────────────────────────────────────
 
   VaccinationRecord? _findRecord(SuggestedVaccine vaccine, List<VaccinationRecord> records) {
-    final key = vaccine.id.toLowerCase();
-    final nameParts = vaccine.name.toLowerCase().replaceAll(RegExp(r'\s*[—-].*'), '').trim().split(' ');
+    final vaccineNameLower = vaccine.name.toLowerCase();
+    // Lấy phần tên chính (bỏ phần mô tả sau dấu gạch ngang/ngoặc)
+    final baseName = vaccineNameLower.split(RegExp(r'\s*[—-]\s*')).first.trim();
+    final nameParts = baseName.split(' ').where((p) => p.length >= 2).toList();
+    
     return records.where((r) {
       final rName = r.vaccineName.toLowerCase();
-      return nameParts.any((part) => part.length > 3 && rName.contains(part));
+      // 1. Phải trùng khớp tên cơ bản (ví dụ: "cúm" có trong "cúm mùa")
+      // 2. Hoặc trùng khớp id (nếu có lưu)
+      return nameParts.every((part) => rName.contains(part)) || rName.contains(baseName);
     }).firstOrNull;
   }
 
