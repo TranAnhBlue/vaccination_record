@@ -8,7 +8,7 @@ const String _systemPrompt = '''Bạn là Trợ lý AI Tiêm chủng thông minh
 - Phân tích giấy/sổ tiêm chủng từ ảnh
 - Nhắc nhở lịch tiêm và giải đáp thắc mắc về phản ứng sau tiêm
 
-Hãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu, chính xác về y tế. 
+Hãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu, chính xác về y tế.
 Khi không chắc chắn, hãy khuyên người dùng tham khảo bác sĩ hoặc cơ sở y tế gần nhất.''';
 
 class AIService {
@@ -17,6 +17,11 @@ class AIService {
 
   Future<GenerativeModel> _getModel() async {
     final apiKey = await AIConfig.getApiKey();
+
+    if (apiKey.isEmpty) {
+      throw Exception('missing_api_key');
+    }
+
     if (_model == null || _currentApiKey != apiKey) {
       _currentApiKey = apiKey;
       _model = GenerativeModel(
@@ -25,7 +30,25 @@ class AIService {
         systemInstruction: Content.system(_systemPrompt),
       );
     }
+
     return _model!;
+  }
+
+  String _mapRole(dynamic role) {
+    final r = (role ?? '').toString().toLowerCase();
+    if (r == 'model' || r == 'assistant') return 'model';
+    return 'user';
+  }
+
+  List<TextPart> _mapParts(dynamic parts) {
+    if (parts is! List) return [TextPart('')];
+
+    return parts.map<TextPart>((p) {
+      if (p is Map) {
+        return TextPart((p['text'] ?? '').toString());
+      }
+      return TextPart(p.toString());
+    }).toList();
   }
 
   /// ================= CHAT STREAM =================
@@ -33,25 +56,26 @@ class AIService {
     List<Map<String, dynamic>> history,
     String message,
   ) async* {
-    final model = await _getModel();
-    final contents = <Content>[];
-
-    for (final h in history) {
-      contents.add(
-        Content(
-          h["role"],
-          (h["parts"] as List).map((p) => TextPart(p["text"])).toList(),
-        ),
-      );
-    }
-
-    contents.add(Content.text(message));
-
     try {
+      final model = await _getModel();
+      final contents = <Content>[];
+
+      for (final h in history) {
+        contents.add(
+          Content(
+            _mapRole(h['role']),
+            _mapParts(h['parts']),
+          ),
+        );
+      }
+
+      contents.add(Content.text(message));
+
       final response = model.generateContentStream(contents);
+
       await for (final chunk in response) {
         final text = chunk.text;
-        if (text != null) {
+        if (text != null && text.trim().isNotEmpty) {
           yield text;
         }
       }
@@ -61,25 +85,40 @@ class AIService {
       yield '🌍 Gemini AI chưa hỗ trợ vùng của bạn. Vui lòng thử dùng VPN hoặc kiểm tra lại tài khoản Google AI.';
     } on ServerException catch (e) {
       final err = e.message.toLowerCase();
+
       if (err.contains('quota') || err.contains('429')) {
         yield '❌ Giới hạn AI đã hết (Quota exceeded). Thử lại sau 1 phút hoặc dùng API key cá nhân.';
-      } else if (err.contains('not found') || err.contains('unsupported')) {
-        yield '⚠️ Model "${AIConfig.model}" không tìm thấy hoặc chưa được hỗ trợ cho API Key này. Hãy thử quay lại gemini-pro.';
+      } else if (err.contains('not found') ||
+          err.contains('unsupported') ||
+          err.contains('404')) {
+        yield '⚠️ Model "${AIConfig.model}" không tìm thấy hoặc chưa được hỗ trợ cho API key này. Hãy đổi model trong Cài đặt AI.';
+      } else if (err.contains('403') ||
+          err.contains('api key') ||
+          err.contains('unauthorized')) {
+        yield '❌ API key không hợp lệ hoặc không có quyền dùng model này.';
       } else {
         yield '❌ Lỗi máy chủ: ${e.message}. Vui lòng thử lại.';
       }
     } catch (e) {
       final msg = e.toString().toLowerCase();
-      if (msg.contains('quota') || msg.contains('429')) {
-        yield '❌ Bạn đã hết lượt sử dụng AI miễn phí (Quota exceeded). Thử lại sau 1-2 phút.';
-      } else if (msg.contains('not_found') || msg.contains('404')) {
-        yield '⚠️ Lỗi: Không tìm thấy model AI phù hợp. Hãy kiểm tra API key hoặc đổi sang gemini-pro.';
-      } else if (msg.contains('api_key') || msg.contains('apikey') || msg.contains('unauthorized') || msg.contains('403')) {
-        yield '❌ API key không hợp lệ hoặc không có quyền truy cập model này.';
-      } else if (msg.contains('network') || msg.contains('socketexception') || msg.contains('timeout')) {
-        yield '📡 Không có kết nối mạng. Kiểm tra internet và thử lại.';
+
+      if (msg.contains('missing_api_key')) {
+        yield '❌ Bạn chưa cấu hình Gemini API key. Vào Hồ sơ → Cài đặt AI để nhập key.';
+      } else if (msg.contains('quota') || msg.contains('429')) {
+        yield '❌ API key đã hết quota. Hãy thử key khác hoặc thử lại sau.';
+      } else if (msg.contains('not found') || msg.contains('404')) {
+        yield '⚠️ Model AI không tồn tại hoặc đã ngừng hỗ trợ. Hãy đổi sang model khác.';
+      } else if (msg.contains('403') ||
+          msg.contains('api key') ||
+          msg.contains('apikey') ||
+          msg.contains('unauthorized')) {
+        yield '❌ API key không hợp lệ hoặc không có quyền dùng model này.';
+      } else if (msg.contains('socketexception') ||
+          msg.contains('network') ||
+          msg.contains('timeout')) {
+        yield '📡 Không có kết nối mạng. Kiểm tra internet rồi thử lại.';
       } else {
-        yield '⚠️ Không thể kết nối AI. Thử lại sau.\n(Chi tiết: ${e.toString().split('\n').first})';
+        yield '⚠️ Không thể kết nối AI. ${e.toString().split('\n').first}';
       }
     }
   }
@@ -89,16 +128,20 @@ class AIService {
     try {
       final model = await _getModel();
       final bytes = await file.readAsBytes();
+
       final response = await model.generateContent([
         Content.multi([
-          TextPart('Đây là ảnh sổ/phiếu tiêm chủng. Hãy đọc và liệt kê:\n'
-              '1. Tên các loại vaccine đã tiêm\n'
-              '2. Ngày tiêm từng mũi\n'
-              '3. Còn mũi nào chưa tiêm không?\n'
-              'Trả lời bằng tiếng Việt, rõ ràng và đầy đủ.'),
+          TextPart(
+            'Đây là ảnh sổ/phiếu tiêm chủng. Hãy đọc và liệt kê:\n'
+            '1. Tên các loại vaccine đã tiêm\n'
+            '2. Ngày tiêm từng mũi\n'
+            '3. Còn mũi nào chưa tiêm không?\n'
+            'Trả lời bằng tiếng Việt, rõ ràng và đầy đủ.',
+          ),
           DataPart('image/jpeg', bytes),
-        ])
+        ]),
       ]);
+
       return response.text ?? 'Không đọc được nội dung ảnh.';
     } on InvalidApiKey {
       return '❌ API key không hợp lệ. Vào Hồ sơ → Cài đặt AI để nhập key mới.';
@@ -112,12 +155,22 @@ class AIService {
     try {
       final model = await _getModel();
       final response = await model.generateContent([
-        Content.text('Dựa trên dữ liệu tiêm chủng của gia đình dưới đây, hãy đưa ra 1 lời khuyên ngắn gọn (tối đa 2 câu) về mũi tiêm quan trọng nhất cần lưu ý tiếp theo hoặc tình trạng chung.\n'
-            'Dữ liệu:\n$summary\n'
-            'Hãy trả lời bằng tiếng Việt, thân thiện và chuyên nghiệp.')
+        Content.text(
+          'Dựa trên dữ liệu tiêm chủng của gia đình dưới đây, hãy đưa ra 1 lời khuyên ngắn gọn (tối đa 2 câu) về mũi tiêm quan trọng nhất cần lưu ý tiếp theo hoặc tình trạng chung.\n'
+          'Dữ liệu:\n$summary\n'
+          'Hãy trả lời bằng tiếng Việt, thân thiện và chuyên nghiệp.',
+        ),
       ]);
-      return response.text ?? 'Hãy tiếp tục theo dõi lịch tiêm chủng để bảo vệ sức khỏe gia đình.';
-    } catch (_) {
+
+      return response.text ??
+          'Hãy tiếp tục theo dõi lịch tiêm chủng để bảo vệ sức khỏe gia đình.';
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+
+      if (msg.contains('missing_api_key')) {
+        return '❌ Bạn chưa cấu hình Gemini API key.';
+      }
+
       return 'AI đang phân tích dữ liệu gia đình bạn. Hãy quay lại sau ít phút.';
     }
   }
