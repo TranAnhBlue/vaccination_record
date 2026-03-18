@@ -26,7 +26,8 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
   final TextEditingController _noteController = TextEditingController();
-  final TextEditingController _vaccineSearchController = TextEditingController();
+  final TextEditingController _vaccineSearchController =
+  TextEditingController();
 
   final List<String> _centers = [
     'Trung tâm Tiêm chủng VNVC',
@@ -76,150 +77,189 @@ class _BookingScreenState extends State<BookingScreen> {
     final apptVm = context.watch<AppointmentViewModel>();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF6F9FC),
       appBar: AppBar(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.close, color: Colors.black, size: 18),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Đặt lịch tiêm chủng',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        centerTitle: true,
+        title: const Text(
+          'Đặt lịch tiêm chủng',
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
       ),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Banner ───────────────────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppTheme.primary.withOpacity(0.08), AppTheme.primary.withOpacity(0.02)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
-                ),
-                child: Row(
+              _buildHeroBanner(),
+              const SizedBox(height: 18),
+              _buildFormCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.1),
-                        shape: BoxShape.circle,
+                    _sectionTitle('Thành viên tiêm chủng'),
+                    const SizedBox(height: 10),
+                    _buildMemberSelector(householdVm),
+                    const SizedBox(height: 20),
+                    _sectionTitle('Loại vắc-xin'),
+                    const SizedBox(height: 10),
+                    _buildVaccineSelector(),
+                    const SizedBox(height: 20),
+                    _sectionTitle('Cơ sở tiêm chủng'),
+                    const SizedBox(height: 10),
+                    _buildCenterDropdown(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildFormCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Thời gian tiêm',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111827),
                       ),
-                      child: const Icon(Icons.event_available, color: AppTheme.primary, size: 24),
                     ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Đặt lịch hẹn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          SizedBox(height: 2),
-                          Text(
-                            'Lịch hẹn sẽ được lưu và nhắc nhở trước ngày tiêm.',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _sectionTitle('Ngày tiêm'),
+                              const SizedBox(height: 10),
+                              _buildDatePicker(),
+                            ],
                           ),
-                        ],
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _sectionTitle('Giờ tiêm'),
+                              const SizedBox(height: 10),
+                              _buildTimePicker(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildFormCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionTitle('Ghi chú sức khỏe (tuỳ chọn)'),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _noteController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText:
+                        'Dị ứng thuốc, tiền sử bệnh, lưu ý đặc biệt...',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontSize: 14,
+                        ),
+                        fillColor: const Color(0xFFF8FAFC),
+                        filled: true,
+                        contentPadding: const EdgeInsets.all(16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                          const BorderSide(color: Color(0xFFE5E7EB)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                          const BorderSide(color: Color(0xFFE5E7EB)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                          const BorderSide(color: AppTheme.primary),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
-
-              // ── Thành viên ───────────────────────────────────────────────
-              _sectionTitle('Thành viên tiêm chủng'),
-              const SizedBox(height: 10),
-              _buildMemberSelector(householdVm),
               const SizedBox(height: 24),
-
-              // ── Vắc-xin ─────────────────────────────────────────────────
-              _sectionTitle('Loại vắc-xin'),
-              const SizedBox(height: 10),
-              _buildVaccineSelector(),
-              const SizedBox(height: 24),
-
-              // ── Trung tâm ────────────────────────────────────────────────
-              _sectionTitle('Cơ sở tiêm chủng'),
-              const SizedBox(height: 10),
-              _buildCenterDropdown(),
-              const SizedBox(height: 24),
-
-              // ── Ngày & Giờ ──────────────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionTitle('Ngày tiêm'),
-                        const SizedBox(height: 10),
-                        _buildDatePicker(),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionTitle('Giờ tiêm'),
-                        const SizedBox(height: 10),
-                        _buildTimePicker(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // ── Ghi chú ──────────────────────────────────────────────────
-              _sectionTitle('Ghi chú sức khỏe (tuỳ chọn)'),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _noteController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Dị ứng thuốc, tiền sử bệnh, lưu ý đặc biệt...',
-                  fillColor: Colors.grey.shade50,
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // ── Submit ───────────────────────────────────────────────────
               SizedBox(
                 width: double.infinity,
                 height: 56,
-                child: ElevatedButton(
-                  onPressed: apptVm.loading ? null : _submitBooking,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2F80ED), Color(0xFF56CCF2)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2F80ED).withOpacity(0.22),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  child: apptVm.loading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('Xác nhận đặt lịch',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: ElevatedButton(
+                    onPressed: apptVm.loading ? null : _submitBooking,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      disabledBackgroundColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: apptVm.loading
+                        ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.2,
+                      ),
+                    )
+                        : const Text(
+                      'Xác nhận đặt lịch',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -227,45 +267,159 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  Widget _sectionTitle(String t) => Text(t,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey));
+  Widget _buildHeroBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2F80ED), Color(0xFF56CCF2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2F80ED).withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.event_available_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Đặt lịch hẹn tiêm chủng',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Lịch hẹn sẽ được lưu và nhắc nhở trước ngày tiêm.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _sectionTitle(String t) {
+    return Text(
+      t,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF6B7280),
+      ),
+    );
+  }
 
   Widget _buildMemberSelector(HouseholdViewModel hVm) {
-    // Guard: đảm bảo value luôn nằm trong danh sách items
     final memberIds = hVm.members.map((m) => m.id).toList();
-    final safeValue = memberIds.contains(_selectedMemberId) ? _selectedMemberId : null;
+    final safeValue = memberIds.contains(_selectedMemberId)
+        ? _selectedMemberId
+        : null;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
           value: safeValue,
           isExpanded: true,
           hint: const Text('Chọn thành viên'),
+          borderRadius: BorderRadius.circular(16),
           items: hVm.members.map<DropdownMenuItem<int>>((m) {
             return DropdownMenuItem<int>(
               value: m.id,
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 14,
-                    backgroundColor: AppTheme.primary.withOpacity(0.1),
-                    child: Text(m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                    radius: 15,
+                    backgroundColor: AppTheme.primary.withOpacity(0.12),
+                    child: Text(
+                      m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(m.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      Text(m.relationship, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                    ],
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          m.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          m.relationship,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -279,6 +433,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildVaccineSelector() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextFormField(
           controller: _vaccineSearchController,
@@ -286,35 +441,61 @@ class _BookingScreenState extends State<BookingScreen> {
             setState(() {
               _showDropdown = val.isNotEmpty;
               _filteredVaccines = _allVaccines
-                  .where((v) => v.name.toLowerCase().contains(val.toLowerCase()))
+                  .where((v) =>
+                  v.name.toLowerCase().contains(val.toLowerCase()))
                   .toList();
             });
           },
           decoration: InputDecoration(
             hintText: 'Tìm kiếm vắc-xin...',
-            prefixIcon: const Icon(Icons.search, size: 20, color: Colors.grey),
+            hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+            prefixIcon:
+            const Icon(Icons.search, size: 20, color: Colors.grey),
             suffixIcon: _vaccineSearchController.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
-                    onPressed: () {
-                      _vaccineSearchController.clear();
-                      setState(() { _selectedVaccineName = null; _showDropdown = false; });
-                    })
+              icon: const Icon(Icons.clear, size: 18),
+              onPressed: () {
+                _vaccineSearchController.clear();
+                setState(() {
+                  _selectedVaccineName = null;
+                  _showDropdown = false;
+                });
+              },
+            )
                 : null,
-            fillColor: Colors.grey.shade50,
+            fillColor: const Color(0xFFF8FAFC),
             filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppTheme.primary),
+            ),
           ),
         ),
         if (_showDropdown && _filteredVaccines.isNotEmpty)
           Container(
-            constraints: const BoxConstraints(maxHeight: 200),
-            margin: const EdgeInsets.only(top: 4),
+            constraints: const BoxConstraints(maxHeight: 220),
+            margin: const EdgeInsets.only(top: 8),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: ListView.builder(
               shrinkWrap: true,
@@ -323,28 +504,72 @@ class _BookingScreenState extends State<BookingScreen> {
                 final v = _filteredVaccines[i];
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.vaccines, color: AppTheme.primary, size: 18),
-                  title: Text(v.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  subtitle: Text(v.schedule, style: const TextStyle(fontSize: 11)),
-                  onTap: () => setState(() {
-                    _selectedVaccineName = v.name;
-                    _vaccineSearchController.text = v.name;
-                    _showDropdown = false;
-                  }),
+                  leading: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.vaccines,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
+                  ),
+                  title: Text(
+                    v.name,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    v.schedule,
+                    style: const TextStyle(fontSize: 11.5),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _selectedVaccineName = v.name;
+                      _vaccineSearchController.text = v.name;
+                      _showDropdown = false;
+                    });
+                  },
                 );
               },
             ),
           ),
         if (_selectedVaccineName != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle, color: AppTheme.success, size: 16),
-                const SizedBox(width: 6),
-                Text('Đã chọn: $_selectedVaccineName',
-                    style: const TextStyle(color: AppTheme.success, fontSize: 12, fontWeight: FontWeight.w600)),
-              ],
+            padding: const EdgeInsets.only(top: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.success.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: AppTheme.success,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Đã chọn: $_selectedVaccineName',
+                      style: const TextStyle(
+                        color: AppTheme.success,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
       ],
@@ -353,18 +578,31 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildCenterDropdown() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: _centers.contains(_selectedCenter) ? _selectedCenter : _centers.first,
+          value: _centers.contains(_selectedCenter)
+              ? _selectedCenter
+              : _centers.first,
           isExpanded: true,
-          items: _centers.map<DropdownMenuItem<String>>((c) =>
-              DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
+          borderRadius: BorderRadius.circular(16),
+          items: _centers
+              .map(
+                (c) => DropdownMenuItem(
+              value: c,
+              child: Text(
+                c,
+                style: const TextStyle(fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+              .toList(),
           onChanged: (val) => setState(() => _selectedCenter = val!),
         ),
       ),
@@ -373,27 +611,49 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildDatePicker() {
     return InkWell(
+      borderRadius: BorderRadius.circular(16),
       onTap: () async {
         final picked = await showDatePicker(
           context: context,
           initialDate: _selectedDate,
           firstDate: DateTime.now(),
           lastDate: DateTime.now().add(const Duration(days: 365)),
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: AppTheme.primary,
+                ),
+              ),
+              child: child!,
+            );
+          },
         );
-        if (picked != null) setState(() => _selectedDate = picked);
+        if (picked != null) {
+          setState(() => _selectedDate = picked);
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today, size: 18, color: AppTheme.primary),
+            const Icon(
+              Icons.calendar_today_rounded,
+              size: 18,
+              color: AppTheme.primary,
+            ),
             const SizedBox(width: 10),
-            Text(DateFormat('dd/MM/yyyy').format(_selectedDate), style: const TextStyle(fontSize: 14)),
+            Expanded(
+              child: Text(
+                DateFormat('dd/MM/yyyy').format(_selectedDate),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
       ),
@@ -402,22 +662,37 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildTimePicker() {
     return InkWell(
+      borderRadius: BorderRadius.circular(16),
       onTap: () async {
-        final picked = await showTimePicker(context: context, initialTime: _selectedTime);
-        if (picked != null) setState(() => _selectedTime = picked);
+        final picked = await showTimePicker(
+          context: context,
+          initialTime: _selectedTime,
+        );
+        if (picked != null) {
+          setState(() => _selectedTime = picked);
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.access_time, size: 18, color: AppTheme.primary),
+            const Icon(
+              Icons.access_time_rounded,
+              size: 18,
+              color: AppTheme.primary,
+            ),
             const SizedBox(width: 10),
-            Text(_selectedTime.format(context), style: const TextStyle(fontSize: 14)),
+            Expanded(
+              child: Text(
+                _selectedTime.format(context),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
       ),
@@ -449,12 +724,10 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Reload appointments for the user
       if (authVm.currentUser != null) {
         apptVm.load(userId: authVm.currentUser!.id);
       }
 
-      // Send local notification
       NotificationService().showInstantNotification(
         'Đặt lịch thành công 🎉',
         'Lịch tiêm $_selectedVaccineName vào ${DateFormat('dd/MM/yyyy').format(_selectedDate)} lúc ${_selectedTime.format(context)} tại $_selectedCenter',
@@ -474,7 +747,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: AppTheme.danger),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppTheme.danger,
+      ),
     );
   }
 }
