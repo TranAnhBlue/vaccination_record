@@ -231,6 +231,20 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
 
   void _handleSave() async {
     if (_formKey.currentState!.validate()) {
+      // Validate date of birth vs injection date
+      if (_selectedMember != null) {
+        final dob = DateTime.tryParse(_selectedMember!.dob);
+        if (dob != null && _injectionDate.isBefore(dob)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Ngày tiêm không thể trước ngày sinh của thành viên"),
+              backgroundColor: AppTheme.danger,
+            ),
+          );
+          return;
+        }
+      }
+      
       setState(() => _isLoading = true);
       try {
         final vm = context.read<VaccinationViewModel>();
@@ -284,9 +298,9 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
       onTap: () async {
         final d = await showDatePicker(
           context: context,
-          initialDate: date ?? DateTime.now(),
-          firstDate: DateTime(2000),
-          lastDate: DateTime(2100),
+          initialDate: (date != null && date.isBefore(DateTime.now())) ? date : DateTime.now(),
+          firstDate: isOptional ? DateTime(2000) : (_selectedMember != null ? DateTime.tryParse(_selectedMember!.dob) ?? DateTime(1900) : DateTime(1900)),
+          lastDate: isOptional ? DateTime(2100) : DateTime.now(),
         );
         if (d != null) onPicked(d);
       },

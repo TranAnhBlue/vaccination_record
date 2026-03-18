@@ -43,21 +43,30 @@ class ProfileScreen extends StatelessWidget {
             _buildSectionTitle("Thông tin cá nhân"),
             const SizedBox(height: 16),
             _buildInfoCard([
-              _buildInfoRow(context, Icons.person_outline, "Họ và tên", user?.name ?? "Chưa cập nhật", () {
-                _showEditDialog(context, "Họ và tên", user?.name ?? "", (val) {
-                  authVm.updateProfile(val, user?.dob ?? "", user?.gender ?? "");
+              _buildInfoRow(context, Icons.person_outline, "Họ và tên", user?.name ?? "Chưa cập nhật", () async {
+                _showEditDialog(context, "Họ và tên", user?.name ?? "", (val) async {
+                  await authVm.updateProfile(val, user?.dob ?? "", user?.gender ?? "");
+                  if (context.mounted) _syncWithHousehold(context, val, user?.dob, user?.gender);
                 });
               }),
               const Divider(height: 1),
-              _buildInfoRow(context, Icons.calendar_month_outlined, "Ngày sinh", user?.dob.isEmpty == true ? "Chưa cập nhật" : user!.dob, () {
-                _showDatePicker(context, user?.dob ?? "", (val) {
-                  authVm.updateProfile(user?.name ?? "", val, user?.gender ?? "");
-                });
-              }),
+              _buildInfoRow(
+                context,
+                Icons.calendar_month_outlined,
+                "Ngày sinh",
+                _formatDob(user?.dob),
+                    () {
+                  _showDatePicker(context, user?.dob ?? "", (val) async {
+                    await authVm.updateProfile(user?.name ?? "", val, user?.gender ?? "");
+                    if (context.mounted) _syncWithHousehold(context, user?.name, val, user?.gender);
+                  });
+                },
+              ),
               const Divider(height: 1),
               _buildInfoRow(context, Icons.wc_outlined, "Giới tính", user?.gender.isEmpty == true ? "Chưa cập nhật" : user!.gender, () {
-                _showGenderDropdown(context, user?.gender ?? "", (val) {
-                  authVm.updateProfile(user?.name ?? "", user?.dob ?? "", val);
+                _showGenderDropdown(context, user?.gender ?? "", (val) async {
+                  await authVm.updateProfile(user?.name ?? "", user?.dob ?? "", val);
+                  if (context.mounted) _syncWithHousehold(context, user?.name, user?.dob, val);
                 });
               }),
             ]),
@@ -220,6 +229,20 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  void _syncWithHousehold(BuildContext context, String? name, String? dob, String? gender) {
+    final householdVm = context.read<HouseholdViewModel>();
+    try {
+      final mainMember = householdVm.members.firstWhere((m) => m.relationship == "Chủ hộ");
+      householdVm.updateMember(mainMember.copyWith(
+        name: name,
+        dob: dob,
+        gender: gender,
+      ));
+    } catch (_) {
+      // If "Chủ hộ" not found, we don't sync to household members
+    }
+  }
+
   Future<void> _showDatePicker(BuildContext context, String initialValue, Function(String) onSave) async {
     DateTime initialDate;
     try {
@@ -257,7 +280,7 @@ class ProfileScreen extends StatelessWidget {
     );
 
     if (date != null) {
-      onSave(DateFormat('dd/MM/yyyy').format(date));
+      onSave(DateFormat('yyyy-MM-dd').format(date));
     }
   }
 
@@ -316,5 +339,31 @@ class ProfileScreen extends StatelessWidget {
       trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
+  }
+
+  DateTime? _parseDob(String? dob) {
+    if (dob == null || dob.trim().isEmpty) return null;
+
+    final value = dob.trim();
+
+    try {
+      if (value.contains('/')) {
+        return DateFormat('dd/MM/yyyy').parseStrict(value);
+      }
+
+      if (value.contains('-')) {
+        return DateTime.parse(value);
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return null;
+  }
+
+  String _formatDob(String? dob) {
+    final date = _parseDob(dob);
+    if (date == null) return "Chưa cập nhật";
+    return DateFormat('dd/MM/yyyy').format(date);
   }
 }

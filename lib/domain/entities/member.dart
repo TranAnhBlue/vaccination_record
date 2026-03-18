@@ -14,4 +14,22 @@ class Member {
     required this.gender,
     required this.relationship,
   });
+
+  Member copyWith({
+    int? id,
+    int? userId,
+    String? name,
+    String? dob,
+    String? gender,
+    String? relationship,
+  }) {
+    return Member(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      name: name ?? this.name,
+      dob: dob ?? this.dob,
+      gender: gender ?? this.gender,
+      relationship: relationship ?? this.relationship,
+    );
+  }
 }

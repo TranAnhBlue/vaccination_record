@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../viewmodels/household_viewmodel.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../../domain/entities/member.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -162,6 +163,24 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
       if (_dob == null) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vui lòng chọn ngày sinh")));
       return;
     }
+    // Validate age for Household Head (must be 18+)
+    if (_relationship == "Chủ hộ") {
+      final now = DateTime.now();
+      int age = now.year - _dob!.year;
+      if (now.month < _dob!.month || (now.month == _dob!.month && now.day < _dob!.day)) {
+        age--;
+      }
+      if (age < 18) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Chủ hộ phải từ 18 tuổi trở lên"),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     final householdVm = context.read<HouseholdViewModel>();
     try {
@@ -173,6 +192,17 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
         gender: _gender,
         relationship: _relationship,
       ));
+
+      // Sync with AuthViewModel if this is the Household Head
+      if (_relationship == "Chủ hộ") {
+        final authVm = context.read<AuthViewModel>();
+        await authVm.updateProfile(
+          nameController.text.trim(),
+          DateFormat('yyyy-MM-dd').format(_dob!),
+          _gender,
+        );
+      }
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

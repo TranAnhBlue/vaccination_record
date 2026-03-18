@@ -800,7 +800,14 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const SizedBox(width: 32), 
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Expanded(
+                child: Text(
+                  title, 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
               _buildIconButton(Icons.notifications_none),
             ],
           ),

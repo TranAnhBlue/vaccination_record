@@ -138,6 +138,24 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       return;
     }
 
+    // Validate age for Household Head (must be 18+)
+    if (_relationship == "Chủ hộ") {
+      final now = DateTime.now();
+      int age = now.year - _dob!.year;
+      if (now.month < _dob!.month || (now.month == _dob!.month && now.day < _dob!.day)) {
+        age--;
+      }
+      if (age < 18) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Chủ hộ phải từ 18 tuổi trở lên"),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     final authVm = context.read<AuthViewModel>();
     final householdVm = context.read<HouseholdViewModel>();
