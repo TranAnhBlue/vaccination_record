@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../domain/services/vaccine_suggestion_service.dart';
+import '../../domain/entities/appointment.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../domain/entities/member.dart';
 import '../viewmodels/household_viewmodel.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
 import '../viewmodels/appointment_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../sync/user_medical_data_sync.dart';
 import '../../core/theme/app_theme.dart';
+
+const _sPageBg = Color(0xFFF8FAFC);
+const _sBorder = Color(0xFFE2E8F0);
+const _sTextMuted = Color(0xFF64748B);
 
 class SuggestionsScreen extends StatefulWidget {
   const SuggestionsScreen({super.key});
@@ -21,7 +27,6 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   final _service = VaccineSuggestionService();
-  int _selectedMemberIndex = 0;
 
   @override
   void initState() {
@@ -43,7 +48,7 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
 
     if (members.isEmpty) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF6F9FC),
+        backgroundColor: _sPageBg,
         appBar: _appBar(),
         body: const Center(
           child: CircularProgressIndicator(color: AppTheme.primary),
@@ -56,7 +61,6 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
       _tabController = TabController(length: members.length, vsync: this);
       _tabController.addListener(() {
         if (!_tabController.indexIsChanging) {
-          setState(() => _selectedMemberIndex = _tabController.index);
           final m = members[_tabController.index];
           if (m.id != null) vacVm.load(memberId: m.id);
         }
@@ -64,7 +68,7 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F9FC),
+      backgroundColor: _sPageBg,
       appBar: _appBar(),
       body: Column(
         children: [
@@ -88,89 +92,123 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
   AppBar _appBar() => AppBar(
     title: const Text(
       'Lịch tiêm theo độ tuổi',
-      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+      style: TextStyle(
+        fontWeight: FontWeight.w800,
+        fontSize: 17,
+        color: Color(0xFF0F172A),
+      ),
     ),
     backgroundColor: Colors.white,
     surfaceTintColor: Colors.white,
     elevation: 0,
     centerTitle: true,
+    bottom: PreferredSize(
+      preferredSize: const Size.fromHeight(1),
+      child: Container(height: 1, color: _sBorder.withValues(alpha: 0.6)),
+    ),
   );
 
   Widget _buildMemberTabs(List<Member> members) {
-    return Container(
+    return Material(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF3F6FA),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          dividerColor: Colors.transparent,
-          indicator: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          clipBehavior: Clip.none,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _sBorder.withValues(alpha: 0.85)),
           ),
-          labelColor: AppTheme.primary,
-          unselectedLabelColor: Colors.grey,
-          tabAlignment: TabAlignment.start,
-          labelPadding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          tabs: members.map((m) {
-            return Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: AppTheme.primary.withOpacity(0.12),
-                    child: Text(
-                      m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            dividerColor: Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            // Không thụt ngang: indicator trùng vùng tab, avatar không tràn ra ngoài viền chọn.
+            indicatorPadding: const EdgeInsets.symmetric(vertical: 4),
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1E40AF).withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            labelColor: AppTheme.primary,
+            unselectedLabelColor: _sTextMuted,
+            tabAlignment: TabAlignment.start,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            tabs: members.map((m) {
+              return Tab(
+                height: 58,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        m.relationship == 'Chủ hộ' ? 'Tôi' : m.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12.5,
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: const Color(0xFFDBEAFE),
+                        child: Text(
+                          m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1D4ED8),
+                          ),
                         ),
                       ),
-                      Text(
-                        m.dob.isEmpty
-                            ? 'Chưa cập nhật'
-                            : _service.getAgeLabelFromDob(m.dob),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.normal,
-                          color: Colors.grey,
+                      const SizedBox(width: 10),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 112),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              m.relationship == 'Chủ hộ' ? 'Tôi' : m.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                height: 1.2,
+                                color: Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              m.dob.isEmpty
+                                  ? 'Chưa cập nhật'
+                                  : _service.getAgeLabelFromDob(m.dob),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                height: 1.15,
+                                color: _sTextMuted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            );
-          }).toList(),
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -197,7 +235,12 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final uid = context.read<AuthViewModel>().currentUser?.id;
+      if (uid != null) {
+        await context.read<AppointmentViewModel>().load(userId: uid);
+      }
+      if (!mounted) return;
       if (widget.member.id != null) {
         context.read<VaccinationViewModel>().load(memberId: widget.member.id);
       }
@@ -207,12 +250,25 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
   @override
   Widget build(BuildContext context) {
     final vacVm = context.watch<VaccinationViewModel>();
+    final apptVm = context.watch<AppointmentViewModel>();
     final memberRecords = widget.member.id != null
         ? vacVm.recordsForMember(widget.member.id!)
         : <VaccinationRecord>[];
 
-    final suggestion =
-    widget.service.getSuggestionsForMember(widget.member, memberRecords);
+    final memberAppts = widget.member.id != null
+        ? apptVm.appointments
+            .where(
+              (a) =>
+                  a.memberId == widget.member.id && a.status == 'pending',
+            )
+            .toList()
+        : <Appointment>[];
+
+    final suggestion = widget.service.getSuggestionsForMember(
+      widget.member,
+      memberRecords,
+      appointments: memberAppts,
+    );
 
     final filtered = _applyFilter(suggestion.vaccines);
 
@@ -251,28 +307,28 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
 
   Widget _buildProgressHeader(MemberVaccineSuggestion s) {
     final percent = (s.progress * 100).toInt();
-    final Color progressColor = percent == 100
-        ? AppTheme.success
+    final ringColor = percent >= 100
+        ? const Color(0xFF86EFAC)
         : percent >= 60
-        ? Colors.orange
-        : AppTheme.primary;
+            ? const Color(0xFFFDE68A)
+            : Colors.white;
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2F80ED), Color(0xFF56CCF2)],
+          colors: [Color(0xFF1E3A8A), Color(0xFF1D4ED8), Color(0xFF2563EB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2F80ED).withOpacity(0.2),
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.28),
             blurRadius: 20,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -280,6 +336,7 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
@@ -289,13 +346,15 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
                       widget.member.dob.isEmpty
                           ? 'Chưa cập nhật ngày sinh'
                           : widget.service.getAgeLabelFromDob(widget.member.dob),
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.88),
                         fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     RichText(
                       text: TextSpan(
                         style: const TextStyle(color: Colors.white),
@@ -303,15 +362,26 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
                           TextSpan(
                             text: '${s.doneCount}',
                             style: const TextStyle(
-                              fontSize: 30,
+                              fontSize: 32,
                               fontWeight: FontWeight.w900,
+                              height: 1,
+                              letterSpacing: -0.5,
                             ),
                           ),
                           TextSpan(
-                            text: ' / ${s.vaccines.length} mũi đã tiêm',
-                            style: const TextStyle(
+                            text: ' / ${s.vaccines.length}',
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' mũi đã tiêm',
+                            style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white70,
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -321,22 +391,27 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
                 ),
               ),
               SizedBox(
-                width: 68,
-                height: 68,
+                width: 72,
+                height: 72,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    CircularProgressIndicator(
-                      value: s.progress,
-                      strokeWidth: 5,
-                      color: Colors.white,
-                      backgroundColor: Colors.white.withOpacity(0.22),
+                    SizedBox(
+                      width: 72,
+                      height: 72,
+                      child: CircularProgressIndicator(
+                        value: s.progress,
+                        strokeWidth: 5,
+                        color: ringColor,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        strokeCap: StrokeCap.round,
+                      ),
                     ),
                     Text(
                       '$percent%',
                       style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
                         color: Colors.white,
                       ),
                     ),
@@ -345,25 +420,31 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          const SizedBox(height: 16),
+          Row(
             children: [
-              _statChip(
-                Icons.pending_outlined,
-                '${s.pendingCount} chưa tiêm',
-                Colors.white,
+              Expanded(
+                child: _miniStatTile(
+                  Icons.hourglass_empty_rounded,
+                  '${s.pendingCount}',
+                  'Chưa tiêm',
+                ),
               ),
-              _statChip(
-                Icons.event_outlined,
-                '${s.scheduledCount} lịch hẹn',
-                Colors.white,
+              const SizedBox(width: 8),
+              Expanded(
+                child: _miniStatTile(
+                  Icons.event_available_rounded,
+                  '${s.scheduledCount}',
+                  'Lịch hẹn',
+                ),
               ),
-              _statChip(
-                Icons.check_circle_outline,
-                '${s.doneCount} đã xong',
-                Colors.white,
+              const SizedBox(width: 8),
+              Expanded(
+                child: _miniStatTile(
+                  Icons.verified_rounded,
+                  '${s.doneCount}',
+                  'Đã xong',
+                ),
               ),
             ],
           ),
@@ -376,24 +457,37 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
     );
   }
 
-  Widget _statChip(IconData icon, String label, Color color) {
+  Widget _miniStatTile(IconData icon, String value, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.16),
-        borderRadius: BorderRadius.circular(999),
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
         children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
+          Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.95)),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
             label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
             style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.w700,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              height: 1.15,
+              color: Colors.white.withValues(alpha: 0.88),
             ),
           ),
         ],
@@ -405,9 +499,9 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.16),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: const Row(
         children: [
@@ -428,43 +522,42 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
     final filters = ['Tất cả', 'Chưa tiêm', 'Lịch hẹn', 'Đã tiêm', 'Bắt buộc'];
 
     return SizedBox(
-      height: 50,
+      height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
         children: filters.map((f) {
           final isSelected = _filter == f;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: () => setState(() => _filter = f),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color:
-                    isSelected ? AppTheme.primary : const Color(0xFFE5E7EB),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setState(() => _filter = f),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.primary
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppTheme.primary
+                          : _sBorder.withValues(alpha: 0.9),
                     ),
-                  ],
-                ),
-                child: Text(
-                  f,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF374151),
-                    fontSize: 12,
-                    fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  child: Text(
+                    f,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : const Color(0xFF334155),
+                      fontSize: 12.5,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -482,236 +575,319 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
     final isPending = vs.status == VaccineStatus.pending;
     final isLoading = _loadingIds.contains(vaccine.id);
     final catColor = Color(widget.service.categoryColorValue(vaccine.category));
+    final Color? accentBar = isDone
+        ? AppTheme.success
+        : (vaccine.isMandatory && isPending ? AppTheme.primary : null);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: isDone
-            ? Border.all(color: AppTheme.success.withOpacity(0.28))
-            : vaccine.isMandatory && isPending
-            ? Border.all(color: Colors.orange.withOpacity(0.35))
-            : null,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _sBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDone ? 0.02 : 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  onTap: isLoading ? null : () => _toggleDone(vs, member),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDone ? AppTheme.success : Colors.transparent,
-                      border: Border.all(
-                        color:
-                        isDone ? AppTheme.success : Colors.grey.shade300,
-                        width: 2,
-                      ),
-                    ),
-                    child: isLoading
-                        ? const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.grey,
-                      ),
-                    )
-                        : isDone
-                        ? const Icon(Icons.check,
-                        color: Colors.white, size: 16)
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              vaccine.name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                color:
-                                isDone ? Colors.grey : const Color(0xFF111827),
-                                decoration:
-                                isDone ? TextDecoration.lineThrough : null,
-                                decorationColor: Colors.grey,
-                              ),
-                            ),
-                          ),
-                          if (vaccine.isMandatory && !isDone)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (accentBar != null)
+              Container(width: 4, color: accentBar),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Tooltip(
+                          message: isDone
+                              ? 'Nhấn để bỏ xác nhận đã tiêm'
+                              : 'Đánh dấu đã tiêm',
+                          child: GestureDetector(
+                            onTap: isLoading ? null : () => _toggleDone(vs, member),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
-                                borderRadius: BorderRadius.circular(999),
+                                shape: BoxShape.circle,
+                                color: isDone
+                                    ? AppTheme.success
+                                    : const Color(0xFFF8FAFC),
                                 border: Border.all(
-                                  color: Colors.orange.shade200,
+                                  color: isDone
+                                      ? AppTheme.success
+                                      : _sBorder,
+                                  width: 2,
                                 ),
                               ),
-                              child: const Text(
-                                'Bắt buộc',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: catColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              vaccine.ageRange,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: catColor,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              child: isLoading
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(7),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primary,
+                                      ),
+                                    )
+                                  : isDone
+                                      ? const Icon(
+                                          Icons.check_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        )
+                                      : Icon(
+                                          Icons.circle_outlined,
+                                          size: 18,
+                                          color: Colors.grey.shade400,
+                                        ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F6FA),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              vaccine.category,
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                color: Color(0xFF4B5563),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        vaccine.description,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: isDone
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
-                          height: 1.45,
                         ),
-                      ),
-                      if (isScheduled && vs.record != null) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.event_outlined,
-                                size: 14,
-                                color: Colors.blue,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      vaccine.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15.5,
+                                        height: 1.25,
+                                        color: isDone
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF0F172A),
+                                        decoration: isDone
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        decorationColor: const Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ),
+                                  if (vaccine.isMandatory && !isDone)
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: const Color(0xFFBFDBFE),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Bắt buộc',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Color(0xFF1D4ED8),
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Lịch: ${_formatDate(vs.record!.date)} · ${vs.record!.location}',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    color: Colors.blue,
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: catColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      vaccine.ageRange,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: catColor,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      vaccine.category,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: _sTextMuted,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                vaccine.description,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDone
+                                      ? const Color(0xFFCBD5E1)
+                                      : const Color(0xFF475569),
+                                  height: 1.5,
+                                ),
+                              ),
+                              if (isScheduled &&
+                                  (vs.record != null ||
+                                      vs.appointment != null)) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFBFDBFE),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.event_available_rounded,
+                                        size: 18,
+                                        color: Color(0xFF1D4ED8),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _scheduledDetailLine(vs),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF1E40AF),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
+                              ],
+                              if (isDone && vs.record != null) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Đã tiêm ${_formatDate(vs.record!.date)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.success,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       ],
-                      if (isDone && vs.record != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          '✓ Đã tiêm ngày ${_formatDate(vs.record!.date)}',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: AppTheme.success,
-                            fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (isPending || isScheduled)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.success,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: isLoading
+                                  ? null
+                                  : () => _toggleDone(vs, member),
+                              icon: isLoading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_rounded, size: 18),
+                              label: const Text(
+                                'Đã tiêm rồi',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isPending || isScheduled) ...[
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: Colors.grey.shade100),
-                ),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _ActionButton(
-                      label: '✓ Đã tiêm rồi',
-                      color: AppTheme.success,
-                      outlined: false,
-                      isLoading: isLoading,
-                      onTap: () => _toggleDone(vs, member),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.primary,
+                                side: const BorderSide(
+                                  color: AppTheme.primary,
+                                  width: 1.5,
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: () =>
+                                  _showBookingSheet(vs.vaccine.name, member),
+                              icon: const Icon(
+                                Icons.calendar_month_rounded,
+                                size: 18,
+                              ),
+                              label: const Text(
+                                'Đặt lịch',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _ActionButton(
-                      label: '📅 Đặt lịch hẹn',
-                      color: AppTheme.primary,
-                      outlined: true,
-                      onTap: () => _showBookingSheet(vs.vaccine.name, member),
-                    ),
-                  ),
                 ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -733,7 +909,6 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
         await vacVm.add(
           VaccinationRecord(
             vaccineName: vaccine.name,
-            dose: 1,
             date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
             reminderDate: '',
             location: '',
@@ -744,6 +919,9 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
         );
       }
 
+      if (mounted) {
+        await syncUserMedicalData(context);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -790,38 +968,41 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
   Widget _buildEmpty() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(28),
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.verified_rounded,
-                size: 60,
-                color: Colors.green.shade400,
+                size: 56,
+                color: AppTheme.success,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             const Text(
-              'Hoàn hảo! Không còn gợi ý nào',
+              'Không còn gợi ý trong mục này',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
               ),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               _filter == 'Tất cả'
-                  ? 'Tất cả mũi tiêm phù hợp độ tuổi đã được ghi nhận.'
-                  : 'Không có mũi tiêm nào ở mục "$_filter".',
+                  ? 'Các mũi tiêm phù hợp độ tuổi đã được ghi nhận đủ.'
+                  : 'Không có mũi tiêm nào khớp bộ lọc "$_filter".',
               style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 13.5,
+                color: _sTextMuted,
+                fontSize: 14,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -830,6 +1011,18 @@ class _MemberVaccineViewState extends State<_MemberVaccineView> {
         ),
       ),
     );
+  }
+
+  String _scheduledDetailLine(SuggestedVaccineStatus vs) {
+    final r = vs.record;
+    if (r != null) {
+      return 'Lịch: ${_formatDate(r.date)} · ${r.location}';
+    }
+    final a = vs.appointment;
+    if (a != null) {
+      return 'Lịch: ${_formatDate(a.appointmentDate)} · ${a.appointmentTime} · ${a.center}';
+    }
+    return '';
   }
 
   String _formatDate(String dateStr) {
@@ -908,7 +1101,7 @@ class _QuickBookingSheetState extends State<_QuickBookingSheet> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
+                  color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
@@ -1116,7 +1309,8 @@ class _QuickBookingSheetState extends State<_QuickBookingSheet> {
       );
 
       if (authVm.currentUser?.id != null) {
-        apptVm.load(userId: authVm.currentUser!.id);
+        if (!mounted) return;
+        await syncUserMedicalData(context);
       }
 
       if (mounted) {
@@ -1126,57 +1320,6 @@ class _QuickBookingSheetState extends State<_QuickBookingSheet> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final String label;
-  final Color color;
-  final bool outlined;
-  final VoidCallback onTap;
-  final bool isLoading;
-
-  const _ActionButton({
-    required this.label,
-    required this.color,
-    required this.outlined,
-    required this.onTap,
-    this.isLoading = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        decoration: BoxDecoration(
-          color: outlined ? Colors.transparent : color,
-          borderRadius: BorderRadius.circular(12),
-          border: outlined ? Border.all(color: color) : null,
-        ),
-        child: Center(
-          child: isLoading
-              ? SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: outlined ? color : Colors.white,
-            ),
-          )
-              : Text(
-            label,
-            style: TextStyle(
-              color: outlined ? color : Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 12.5,
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

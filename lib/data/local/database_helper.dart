@@ -11,6 +11,24 @@ class DatabaseHelper {
 
   DatabaseHelper._init();
 
+  /// Đóng singleton và xóa file DB — dùng trong `doctest/` để mỗi test độc lập.
+  @visibleForTesting
+  static Future<void> resetForTesting() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+    if (kIsWeb) return;
+    try {
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+      final path = join(await getDatabasesPath(), 'vaccination.db');
+      await deleteDatabase(path);
+    } catch (_) {}
+  }
+
   Future<Database> get database async {
     _database ??= await _initDB();
     return _database!;
@@ -33,7 +51,20 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 8,
+      version: 10,
+      // Enforce FOREIGN KEY constraints so ON DELETE CASCADE works correctly.
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+        // Android: sqlite native từ chối execute() với PRAGMA busy_timeout
+        // ("Queries can be performed using ... query or rawQuery methods only").
+        if (Platform.isAndroid) {
+          try {
+            await db.rawQuery('PRAGMA busy_timeout = 5000');
+          } catch (_) {}
+        } else {
+          await db.execute('PRAGMA busy_timeout = 5000');
+        }
+      },
       onCreate: (db, version) async {
         await db.execute('''
         CREATE TABLE users(
@@ -62,7 +93,6 @@ class DatabaseHelper {
         CREATE TABLE vaccination_records(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           vaccineName TEXT NOT NULL,
-          dose INTEGER DEFAULT 1,
           date TEXT NOT NULL,
           reminderDate TEXT DEFAULT "",
           imagePath TEXT DEFAULT "",
@@ -88,6 +118,32 @@ class DatabaseHelper {
           FOREIGN KEY (memberId) REFERENCES members (id) ON DELETE CASCADE
         )
         ''');
+
+        // Performance indexes for common queries.
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_members_userId ON members(userId)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_members_relationship ON members(relationship)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_vaccination_records_memberId ON vaccination_records(memberId)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_vaccination_records_date ON vaccination_records(date)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_vaccination_records_reminderDate ON vaccination_records(reminderDate)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_appointments_memberId ON appointments(memberId)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_appointments_date_time ON appointments(appointmentDate, appointmentTime)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status)',
+        );
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -160,6 +216,105 @@ class DatabaseHelper {
             )
             ''');
           } catch (e) { debugPrint('Migration v8 failed: $e'); }
+        }
+
+        if (oldVersion < 9) {
+          // Create indexes only (no schema-breaking changes).
+          try {
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_members_userId ON members(userId)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_members_relationship ON members(relationship)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_vaccination_records_memberId ON vaccination_records(memberId)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_vaccination_records_date ON vaccination_records(date)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_vaccination_records_reminderDate ON vaccination_records(reminderDate)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_appointments_memberId ON appointments(memberId)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_appointments_date_time ON appointments(appointmentDate, appointmentTime)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status)',
+            );
+          } catch (e) {
+            debugPrint('Migration v9 indexes failed: $e');
+          }
+        }
+
+        // v10: bỏ cột `dose`, vaccineName đã mang thông tin "Mũi 1/2/3..."
+        if (oldVersion < 10) {
+          try {
+            // 1) Tạo bảng mới không có cột dose.
+            await db.execute('''
+              CREATE TABLE vaccination_records_new(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vaccineName TEXT NOT NULL,
+                date TEXT NOT NULL,
+                reminderDate TEXT DEFAULT "",
+                imagePath TEXT DEFAULT "",
+                location TEXT DEFAULT "",
+                note TEXT DEFAULT "",
+                memberId INTEGER,
+                isCompleted INTEGER DEFAULT 0,
+                FOREIGN KEY (memberId) REFERENCES members (id) ON DELETE CASCADE
+              )
+            ''');
+
+            // 2) Copy dữ liệu cũ sang bảng mới.
+            final rows = await db.query('vaccination_records');
+            for (final row in rows) {
+              final id = row['id'] as int?;
+              final oldName = (row['vaccineName'] ?? '') as String;
+              final oldDose = row['dose'] as int? ?? 1;
+
+              // Nếu tên đã có "mũi" (hoặc "mui") thì giữ nguyên.
+              final hasDoseInName = RegExp(
+                r'(mũi|mui)\s*\d+',
+                caseSensitive: false,
+              ).hasMatch(oldName);
+              final newName = hasDoseInName
+                  ? oldName
+                  : '$oldName - Mũi $oldDose';
+
+              await db.insert('vaccination_records_new', {
+                if (id != null) 'id': id,
+                'vaccineName': newName,
+                'date': row['date'],
+                'reminderDate': row['reminderDate'] ?? '',
+                'imagePath': row['imagePath'] ?? '',
+                'location': row['location'] ?? '',
+                'note': row['note'] ?? '',
+                'memberId': row['memberId'],
+                'isCompleted': row['isCompleted'] ?? 0,
+              });
+            }
+
+            // 3) Thay bảng cũ.
+            await db.execute('DROP TABLE vaccination_records');
+            await db.execute('ALTER TABLE vaccination_records_new RENAME TO vaccination_records');
+
+            // 4) Tạo lại indexes (vì bảng cũ đã bị DROP).
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_vaccination_records_memberId ON vaccination_records(memberId)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_vaccination_records_date ON vaccination_records(date)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_vaccination_records_reminderDate ON vaccination_records(reminderDate)',
+            );
+          } catch (e) {
+            debugPrint('Migration v10 failed: $e');
+          }
         }
       },
     );

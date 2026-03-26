@@ -4,7 +4,6 @@ class VaccinationRecordModel extends VaccinationRecord {
   VaccinationRecordModel({
     super.id,
     required super.vaccineName,
-    required super.dose,
     required super.date,
     required super.reminderDate,
     super.imagePath,
@@ -18,7 +17,6 @@ class VaccinationRecordModel extends VaccinationRecord {
     return VaccinationRecordModel(
       id: map['id'],
       vaccineName: map['vaccineName'],
-      dose: map['dose'],
       date: map['date'],
       reminderDate: map['reminderDate'] ?? "",
       imagePath: map['imagePath'],
@@ -33,7 +31,6 @@ class VaccinationRecordModel extends VaccinationRecord {
     return {
       'id': id,
       'vaccineName': vaccineName,
-      'dose': dose,
       'date': date,
       'reminderDate': reminderDate,
       'imagePath': imagePath,

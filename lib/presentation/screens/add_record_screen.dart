@@ -8,16 +8,15 @@ import '../viewmodels/vaccination_viewmodel.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
 import '../viewmodels/household_viewmodel.dart';
+import '../sync/user_medical_data_sync.dart';
 import '../../domain/entities/member.dart';
 
 class AddRecordScreen extends StatefulWidget {
   final String? initialVaccineName;
-  final int? initialDose;
 
   const AddRecordScreen({
     super.key,
     this.initialVaccineName,
-    this.initialDose,
   });
 
   @override
@@ -27,7 +26,6 @@ class AddRecordScreen extends StatefulWidget {
 class _AddRecordScreenState extends State<AddRecordScreen> {
   final _formKey = GlobalKey<FormState>();
   final nameController = TextEditingController();
-  final doseController = TextEditingController();
   final locationController = TextEditingController();
   final reactionController = TextEditingController();
   final noteController = TextEditingController();
@@ -48,15 +46,11 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
     if (widget.initialVaccineName != null) {
       nameController.text = widget.initialVaccineName!;
     }
-    if (widget.initialDose != null) {
-      doseController.text = widget.initialDose.toString();
-    }
   }
 
   @override
   void dispose() {
     nameController.dispose();
-    doseController.dispose();
     locationController.dispose();
     reactionController.dispose();
     noteController.dispose();
@@ -127,21 +121,10 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
                     _buildLabel("Loại vaccine"),
                     _buildVaccineSelector(),
                     const SizedBox(height: 16),
-                    _buildLabel("Mũi số"),
+                    _buildLabel("Tên vaccine (kèm - Mũi x)"),
                     _buildTextFormField(
-                      doseController,
-                      "Nhập số mũi",
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return "Vui lòng nhập mũi số";
-                        }
-                        final parsed = int.tryParse(v.trim());
-                        if (parsed == null || parsed <= 0) {
-                          return "Mũi số không hợp lệ";
-                        }
-                        return null;
-                      },
+                      nameController,
+                      'Ví dụ: BCG — Phòng lao - Mũi 2',
                     ),
                   ],
                 ),
@@ -533,7 +516,6 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
         await vm.add(
           VaccinationRecord(
             vaccineName: nameController.text.trim(),
-            dose: int.tryParse(doseController.text.trim()) ?? 1,
             date: DateFormat('yyyy-MM-dd').format(_injectionDate),
             reminderDate: _reminderDate != null
                 ? DateFormat('yyyy-MM-dd').format(_reminderDate!)
@@ -545,6 +527,9 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
           ),
         );
 
+        if (mounted) {
+          await syncUserMedicalData(context);
+        }
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -866,7 +851,7 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            "${nameController.text} (Mũi ${doseController.text})",
+                            nameController.text,
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 14.5,
@@ -926,7 +911,6 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
                   onPressed: () => setState(() {
                     _isSuccess = false;
                     nameController.clear();
-                    doseController.clear();
                     locationController.clear();
                     reactionController.clear();
                     noteController.clear();

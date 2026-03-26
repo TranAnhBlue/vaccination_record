@@ -27,7 +27,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthViewModel(repo)),
-        ChangeNotifierProvider(create: (_) => VaccinationViewModel()..load()),
+        ChangeNotifierProvider(create: (_) => VaccinationViewModel()),
         ChangeNotifierProvider(create: (_) => AIViewModel()),
         ChangeNotifierProvider(create: (_) => HouseholdViewModel()),
         ChangeNotifierProvider(create: (_) => SettingsViewModel()),

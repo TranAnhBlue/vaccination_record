@@ -1,7 +1,6 @@
 class VaccinationRecord {
   final int? id;
   final String vaccineName;
-  final int dose;
   final String date;
   final String reminderDate;
   final String? imagePath;
@@ -13,7 +12,6 @@ class VaccinationRecord {
   VaccinationRecord({
     this.id,
     required this.vaccineName,
-    required this.dose,
     required this.date,
     required this.reminderDate,
     this.imagePath,
@@ -26,7 +24,6 @@ class VaccinationRecord {
   VaccinationRecord copyWith({
     int? id,
     String? vaccineName,
-    int? dose,
     String? date,
     String? reminderDate,
     String? imagePath,
@@ -38,7 +35,6 @@ class VaccinationRecord {
     return VaccinationRecord(
       id: id ?? this.id,
       vaccineName: vaccineName ?? this.vaccineName,
-      dose: dose ?? this.dose,
       date: date ?? this.date,
       reminderDate: reminderDate ?? this.reminderDate,
       imagePath: imagePath ?? this.imagePath,

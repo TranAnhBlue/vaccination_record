@@ -73,8 +73,6 @@ class CertificateCard extends StatelessWidget {
           Row(
             children: [
               _buildDetailItem("Vắc xin", record.vaccineName),
-              const SizedBox(width: 24),
-              _buildDetailItem("Mũi số", record.dose.toString()),
             ],
           ),
           const SizedBox(height: 24),

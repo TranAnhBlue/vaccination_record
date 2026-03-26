@@ -1,3 +1,4 @@
+import '../entities/appointment.dart';
 import '../entities/member.dart';
 import '../entities/vaccination_record.dart';
 
@@ -31,6 +32,7 @@ class MemberVaccineSuggestion {
   final Member member;
   final int ageMonths;
   final List<SuggestedVaccineStatus> vaccines;
+  /// Bản ghi đã tiêm nhưng không ghép được với mục nào trong lịch (tên khác / ngoài danh mục).
   final int extraCount;
 
   MemberVaccineSuggestion({
@@ -51,11 +53,14 @@ class SuggestedVaccineStatus {
   final SuggestedVaccine vaccine;
   final VaccineStatus status;
   final VaccinationRecord? record; // null nếu chưa tiêm
+  /// Lịch hẹn từ màn "Đặt lịch" (bảng appointments), khi chưa có bản ghi tiêm khớp.
+  final Appointment? appointment;
 
   const SuggestedVaccineStatus({
     required this.vaccine,
     required this.status,
     this.record,
+    this.appointment,
   });
 }
 
@@ -261,28 +266,66 @@ class VaccineSuggestionService {
     ),
   ];
 
+  /// Danh mục tên vắc-xin theo lịch BYT (đặt lịch, ô tìm kiếm gợi ý).
+  static List<SuggestedVaccine> get nationalScheduleForSearch =>
+      List<SuggestedVaccine>.unmodifiable(_schedule);
+
   // ── PUBLIC API ────────────────────────────────────────────────────────
 
-  /// Trả về danh sách gợi ý kèm trạng thái cho 1 thành viên
+  /// Trả về danh sách gợi ý kèm trạng thái cho 1 thành viên.
+  ///
+  /// [appointments]: lịch đã đặt (pending) — dùng để đánh dấu "Lịch hẹn" khi chưa có
+  /// [VaccinationRecord] tương ứng (đặt lịch không tạo bản ghi tiêm).
   MemberVaccineSuggestion getSuggestionsForMember(
-      Member member, List<VaccinationRecord> records) {
+    Member member,
+    List<VaccinationRecord> records, {
+    List<Appointment> appointments = const [],
+  }) {
     final ageMonths = _ageInMonths(member.dob);
+    final memberId = member.id;
 
-    // Lọc vaccine: Tất cả những mũi ĐÁNG LẼ phải tiêm từ lúc sinh đến tuổi hiện tại (Tích lũy)
+    // Lọc vaccine theo độ tuổi:
+    // - Nếu là vaccine bắt buộc (`isMandatory`) thì luôn đưa vào để hỗ trợ "tiêm bù".
+    // - Nếu không bắt buộc: chỉ đưa vào khi nằm trong khoảng khuyến nghị (min..max).
     final ageAppropriate = _schedule.where((v) {
-      return ageMonths >= v.minAgeMonths;
+      if (ageMonths < v.minAgeMonths) return false;
+      if (v.isMandatory) return true; // catch-up for mandatory vaccines
+      if (v.maxAgeMonths == -1) return true;
+      return ageMonths <= v.maxAgeMonths;
     }).toList();
+
+    final pendingAppts = memberId == null
+        ? <Appointment>[]
+        : appointments
+            .where((a) => a.memberId == memberId && a.status == 'pending')
+            .toList()
+          ..sort((a, b) => a.appointmentDate.compareTo(b.appointmentDate));
+
+    /// Mỗi lịch hẹn chỉ gắn tối đa một dòng gợi ý (tránh trùng).
+    final remainingAppts = List<Appointment>.from(pendingAppts);
 
     // Gắn trạng thái cho từng vaccine
     final statuses = ageAppropriate.map((vaccine) {
       final matchedRecord = _findRecord(vaccine, records);
-      final status = matchedRecord != null
-          ? (matchedRecord.isCompleted ? VaccineStatus.done : VaccineStatus.scheduled)
-          : VaccineStatus.pending;
+      final Appointment? matchedAppt = matchedRecord == null && memberId != null
+          ? _takeMatchingAppointment(vaccine, remainingAppts)
+          : null;
+
+      final VaccineStatus status;
+      if (matchedRecord != null) {
+        status =
+            matchedRecord.isCompleted ? VaccineStatus.done : VaccineStatus.scheduled;
+      } else if (matchedAppt != null) {
+        status = VaccineStatus.scheduled;
+      } else {
+        status = VaccineStatus.pending;
+      }
+
       return SuggestedVaccineStatus(
         vaccine: vaccine,
         status: status,
         record: matchedRecord,
+        appointment: matchedRecord == null ? matchedAppt : null,
       );
     }).toList();
 
@@ -318,18 +361,62 @@ class VaccineSuggestionService {
 
   // ── HELPERS ───────────────────────────────────────────────────────────
 
-  VaccinationRecord? _findRecord(SuggestedVaccine vaccine, List<VaccinationRecord> records) {
+  /// Khóa phân biệt các mũi trong cùng một vaccine (VD: Mũi 1 vs Mũi 2).
+  /// null = không có nhãn mũi trong tên → chỉ dùng khớp phần tên gốc.
+  String? _doseKeyFromName(String name) {
+    final m = RegExp(r'[mM]ũi\s*(\d+)', unicode: true).firstMatch(name);
+    if (m != null) return 'mui:${m.group(1)}';
+    final lower = name.toLowerCase();
+    if (lower.contains('mũi đầu')) return 'mui:dau';
+    if (lower.contains('liều sơ sinh')) return 'lieu:sosinh';
+    if (lower.contains('nhắc hàng năm')) return 'mui:nam';
+    if (lower.contains('nhắc mỗi 10 năm')) return 'mui:td10';
+    return null;
+  }
+
+  bool _matchesScheduleName(SuggestedVaccine vaccine, String otherNameLower) {
     final vaccineNameLower = vaccine.name.toLowerCase();
-    // Lấy phần tên chính (bỏ phần mô tả sau dấu gạch ngang/ngoặc)
-    final baseName = vaccineNameLower.split(RegExp(r'\s*[—-]\s*')).first.trim();
-    final nameParts = baseName.split(' ').where((p) => p.length >= 2).toList();
-    
+    final baseName =
+        vaccineNameLower.split(RegExp(r'\s*[—-]\s*')).first.trim();
+    final nameParts =
+        baseName.split(' ').where((p) => p.length >= 2).toList();
+    bool baseOk;
+    if (nameParts.isEmpty) {
+      baseOk = otherNameLower.contains(baseName);
+    } else {
+      baseOk = nameParts.every((part) => otherNameLower.contains(part)) ||
+          otherNameLower.contains(baseName);
+    }
+    if (!baseOk) return false;
+
+    final scheduleKey = _doseKeyFromName(vaccine.name);
+    final recordKey = _doseKeyFromName(otherNameLower);
+    if (scheduleKey != null) {
+      if (recordKey != null) return scheduleKey == recordKey;
+      // Bản ghi cũ không ghi rõ mũi: chỉ gán cho hàng "Mũi 1" / mũi đầu / liều sơ sinh.
+      return scheduleKey == 'mui:1' ||
+          scheduleKey == 'mui:dau' ||
+          scheduleKey == 'lieu:sosinh';
+    }
+    return true;
+  }
+
+  VaccinationRecord? _findRecord(SuggestedVaccine vaccine, List<VaccinationRecord> records) {
     return records.where((r) {
-      final rName = r.vaccineName.toLowerCase();
-      // 1. Phải trùng khớp tên cơ bản (ví dụ: "cúm" có trong "cúm mùa")
-      // 2. Hoặc trùng khớp id (nếu có lưu)
-      return nameParts.every((part) => rName.contains(part)) || rName.contains(baseName);
+      return _matchesScheduleName(vaccine, r.vaccineName.toLowerCase());
     }).firstOrNull;
+  }
+
+  /// Lấy một lịch pending khớp tên và loại khỏi [remaining] để không gán trùng.
+  Appointment? _takeMatchingAppointment(
+    SuggestedVaccine vaccine,
+    List<Appointment> remaining,
+  ) {
+    final i = remaining.indexWhere(
+      (a) => _matchesScheduleName(vaccine, a.vaccineName.toLowerCase()),
+    );
+    if (i < 0) return null;
+    return remaining.removeAt(i);
   }
 
   int _ageInMonths(String dob) {
@@ -341,9 +428,14 @@ class VaccineSuggestionService {
     } catch (_) { return 0; }
   }
 
+  /// Trên 2 tuổi (24 tháng) chỉ hiển thị đơn vị **tuổi** (tránh chuỗi dài, vỡ giao diện).
   String getAgeLabel(int months) {
     if (months == 0) return 'Sơ sinh';
     if (months < 12) return '$months tháng tuổi';
+    if (months > 24) {
+      final years = months ~/ 12;
+      return '$years tuổi';
+    }
     final years = months ~/ 12;
     final rem = months % 12;
     if (rem == 0) return '$years tuổi';

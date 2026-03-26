@@ -357,7 +357,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ],
                   ),
                   child: ElevatedButton(
-                    onPressed: (!_agreeToTerms || vm.loading) ? null : _submit,
+                    onPressed: vm.loading
+                        ? null
+                        : () async {
+                            if (!_agreeToTerms) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Vui lòng đồng ý điều khoản và chính sách bảo mật',
+                                  ),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                              return;
+                            }
+                            await _submit();
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
@@ -375,14 +391,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                        : Text(
+                        : const Text(
                       'Đăng ký',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
-                        color: _agreeToTerms
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.85),
+                        color: Colors.white,
                       ),
                     ),
                   ),

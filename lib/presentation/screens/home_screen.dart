@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/routes/app_routes.dart';
-import '../../data/services/ai_service.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../../domain/entities/appointment.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
 import 'add_record_screen.dart';
@@ -15,6 +15,11 @@ import '../viewmodels/household_viewmodel.dart';
 import 'suggestions_screen.dart';
 import '../../domain/services/vaccine_suggestion_service.dart';
 import '../viewmodels/appointment_viewmodel.dart';
+import '../sync/user_medical_data_sync.dart';
+import '../../domain/services/schedule_highlight_service.dart';
+import '../widgets/app_section_card.dart';
+import '../widgets/appointment_date_badge.dart';
+import '../widgets/dashboard_stat_tiles.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,8 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String selectedFilter = "Tất cả";
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
-  String _aiInsight = "Đang tải phân tích từ AI...";
-  bool _isInsightLoaded = false;
 
   @override
   void dispose() {
@@ -40,30 +43,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    Future.microtask(() async {
+      if (!mounted) return;
       final authVm = context.read<AuthViewModel>();
-      if (authVm.currentUser != null) {
-        context.read<AppointmentViewModel>().load(userId: authVm.currentUser!.id);
-        context
-            .read<HouseholdViewModel>()
-            .loadMembers(authVm.currentUser!.id!)
-            .then((_) {
-          final householdVm = context.read<HouseholdViewModel>();
-          final memberIds =
-          householdVm.members.map((m) => m.id).whereType<int>().toList();
-
-          context.read<VaccinationViewModel>().loadAllForMembers(memberIds);
-
-          if (householdVm.selectedMember != null) {
-            context
-                .read<VaccinationViewModel>()
-                .load(memberId: householdVm.selectedMember!.id)
-                .then((_) {
-              _fetchAIInsights();
-            });
-          }
-        });
-      }
+      final householdVm = context.read<HouseholdViewModel>();
+      final uid = authVm.currentUser?.id;
+      if (uid == null) return;
+      await householdVm.loadMembers(uid);
+      if (!mounted) return;
+      await syncUserMedicalData(context);
     });
   }
 
@@ -110,57 +98,57 @@ class _HomeScreenState extends State<HomeScreen> {
       VaccinationViewModel vm,
       HouseholdViewModel householdVm,
       ) {
+    final apptVm = context.watch<AppointmentViewModel>();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    int overdue = 0;
-    int upcomingCount = 0;
     int completedCount = 0;
-    VaccinationRecord? nextRecord;
-
     for (var r in vm.records) {
-      if (r.isCompleted) {
-        completedCount++;
-        continue;
-      }
-      final s = r.calculateStatus(today);
-      if (s == "Quá hạn") overdue++;
-      if (s == "Sắp đến hạn" || s == "Hôm nay") {
-        upcomingCount++;
-        if (nextRecord == null) {
-          nextRecord = r;
-        } else {
-          final currentNext = DateTime.tryParse(nextRecord.reminderDate);
-          final thisRecord = DateTime.tryParse(r.reminderDate);
-          if (currentNext != null &&
-              thisRecord != null &&
-              thisRecord.isBefore(currentNext)) {
-            nextRecord = r;
-          }
-        }
-      }
+      if (r.isCompleted) completedCount++;
     }
 
+    final sel = householdVm.selectedMember;
+    final memberAppointments = sel?.id != null
+        ? apptVm.appointmentsForMember(sel!.id!)
+        : <Appointment>[];
+
+    final recordsForSchedule = sel?.id != null
+        ? vm.recordsForMember(sel!.id!)
+        : vm.records;
+
+    final scheduleHi = computeScheduleHighlights(
+      records: recordsForSchedule,
+      appointments: memberAppointments,
+      today: today,
+    );
+
     final suggestionService = VaccineSuggestionService();
-    int recommended = 0;
+    MemberVaccineSuggestion? memberSuggestion;
     int extraCount = 0;
 
     if (householdVm.selectedMember != null) {
-      final memberRecords =
-      vm.recordsForMember(householdVm.selectedMember!.id!);
-      final suggestions = suggestionService.getSuggestionsForMember(
+      final mid = householdVm.selectedMember!.id!;
+      final memberRecords = vm.recordsForMember(mid);
+      final memberAppts = apptVm.pendingForMember(mid);
+      memberSuggestion = suggestionService.getSuggestionsForMember(
         householdVm.selectedMember!,
         memberRecords,
+        appointments: memberAppts,
       );
-      recommended = suggestions.vaccines.length;
-      extraCount = suggestions.extraCount;
+      extraCount = memberSuggestion.extraCount;
     }
 
-    if (recommended == 0) recommended = 14;
+    var recommendedTotal = memberSuggestion?.vaccines.length ?? 0;
+    if (recommendedTotal == 0) recommendedTotal = 14;
+
+    final completedForCard = (memberSuggestion != null &&
+            memberSuggestion.vaccines.isNotEmpty)
+        ? memberSuggestion.doneCount
+        : completedCount;
 
     return Expanded(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 100),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -169,13 +157,20 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMemberSwitcher(householdVm),
             const SizedBox(height: 20),
             _buildUrgentWarning(vm.records, today),
-            _buildHealthStatusCard(completedCount, recommended, extraCount),
-            const SizedBox(height: 20),
-            _buildAIInsightCard(),
+            _buildHealthStatusCard(
+              completedForCard,
+              recommendedTotal,
+              extraCount,
+              memberSuggestion,
+            ),
             const SizedBox(height: 20),
             _buildQuickLinks(),
             const SizedBox(height: 20),
-            _buildQuickStats(upcomingCount, overdue, nextRecord),
+            DashboardStatRow(
+              upcomingWeekCount: scheduleHi.upcomingWeekCount,
+              nearestDate: scheduleHi.nearestDate,
+              overdueCount: scheduleHi.overdueCount,
+            ),
             const SizedBox(height: 20),
             _buildFamilyOverviewCard(householdVm),
             const SizedBox(height: 20),
@@ -316,6 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMemberSwitcher(HouseholdViewModel householdVm) {
+    final homeCtx = context;
     final sortedMembers = [...householdVm.members]
       ..sort((a, b) {
         if (a.relationship == "Chủ hộ" && b.relationship != "Chủ hộ") return -1;
@@ -340,9 +336,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: sortedMembers.length + 1,
-            itemBuilder: (context, index) {
+            itemBuilder: (itemContext, index) {
               if (index == sortedMembers.length) {
-                return _buildAddMemberButton();
+                return _buildAddMemberButton(homeCtx);
               }
 
               final member = sortedMembers[index];
@@ -351,17 +347,20 @@ class _HomeScreenState extends State<HomeScreen> {
               return GestureDetector(
                 onTap: () {
                   householdVm.selectMember(member);
-                  context.read<VaccinationViewModel>().load(memberId: member.id);
+                  homeCtx.read<VaccinationViewModel>().load(memberId: member.id);
                 },
                 onLongPress: () {
                   Navigator.pushNamed(
-                    context,
+                    homeCtx,
                     AppRoutes.editMember,
                     arguments: member,
-                  ).then((_) {
-                    final authVm = context.read<AuthViewModel>();
+                  ).then((_) async {
+                    if (!mounted || !homeCtx.mounted) return;
+                    final authVm = homeCtx.read<AuthViewModel>();
                     if (authVm.currentUser != null) {
-                      householdVm.loadMembers(authVm.currentUser!.id!);
+                      await householdVm.loadMembers(authVm.currentUser!.id!);
+                      if (!mounted || !homeCtx.mounted) return;
+                      await syncUserMedicalData(homeCtx);
                     }
                   });
                 },
@@ -414,23 +413,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildAddMemberButton() {
+  Widget _buildAddMemberButton(BuildContext homeCtx) {
     return GestureDetector(
       onTap: () {
-        final authVm = context.read<AuthViewModel>();
-        Navigator.pushNamed(context, AppRoutes.addMember).then((_) {
+        final authVm = homeCtx.read<AuthViewModel>();
+        Navigator.pushNamed(homeCtx, AppRoutes.addMember).then((_) async {
+          if (!mounted || !homeCtx.mounted) return;
           if (authVm.currentUser != null) {
-            context
+            await homeCtx
                 .read<HouseholdViewModel>()
-                .loadMembers(authVm.currentUser!.id!)
-                .then((_) {
-              final hVm = context.read<HouseholdViewModel>();
-              if (hVm.selectedMember != null) {
-                context
-                    .read<VaccinationViewModel>()
-                    .load(memberId: hVm.selectedMember!.id);
-              }
-            });
+                .loadMembers(authVm.currentUser!.id!);
+            if (!mounted || !homeCtx.mounted) return;
+            await syncUserMedicalData(homeCtx);
           }
         });
       },
@@ -535,9 +529,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHealthStatusCard(int completed, int recommended, int extra) {
+  String _shortVaccineDisplayName(String name) {
+    final t = name.split(RegExp(r'\s*[—-]\s*')).first.trim();
+    if (t.length <= 44) return t;
+    return '${t.substring(0, 41)}…';
+  }
+
+  Widget _buildHealthStatusCard(
+    int completed,
+    int recommended,
+    int extra,
+    MemberVaccineSuggestion? suggestion,
+  ) {
     final percent =
-    recommended > 0 ? (completed / recommended).clamp(0, 1) * 100 : 0.0;
+        recommended > 0 ? (completed / recommended).clamp(0, 1) * 100 : 0.0;
 
     return Container(
       width: double.infinity,
@@ -644,19 +649,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   if (extra > 0) ...[
                     const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.16),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        "+$extra mũi tự nguyện",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                    Tooltip(
+                      message:
+                          'Số mũi đã tiêm nhưng không ghép được với một mục trong '
+                          'lịch gợi ý (tên ghi khác, vaccine ngoài danh mục, hoặc '
+                          'trùng không khớp). Không nhất thiết là mũi “tự nguyện”.',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          "+$extra ngoài lịch gợi ý",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -664,79 +675,119 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const Text(
-                "Mũi tiêm đã hoàn thành trên tổng số khuyến nghị",
+                "Mũi tiêm đã hoàn thành trên tổng số khuyến nghị (theo lịch gợi ý độ tuổi)",
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAIInsightCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFFEFF6FF), Colors.white],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFD8E7FF)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(14),
+              if (suggestion != null && suggestion.vaccines.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  "Gồm các mũi:",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                child: const Icon(Icons.auto_awesome,
-                    color: AppTheme.primary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  "Phân tích Gia đình AI",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                const SizedBox(height: 8),
+                ...suggestion.vaccines.take(6).map((s) {
+                  final done = s.status == VaccineStatus.done;
+                  final pending = s.status == VaccineStatus.pending;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(
+                            done
+                                ? Icons.check_circle_rounded
+                                : pending
+                                    ? Icons.circle_outlined
+                                    : Icons.schedule_rounded,
+                            size: 15,
+                            color: done
+                                ? const Color(0xFFB9FBC0)
+                                : Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _shortVaccineDisplayName(s.vaccine.name),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              height: 1.35,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          done
+                              ? 'Đã tiêm'
+                              : pending
+                                  ? 'Chưa'
+                                  : 'Hẹn',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                if (suggestion.vaccines.length > 6)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '… và ${suggestion.vaccines.length - 6} mũi khác',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SuggestionsScreen(),
+                        ),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Xem đầy đủ từng loại & mô tả',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white70,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            _aiInsight,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.55,
-              color: Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextButton.icon(
-            onPressed: () => setState(() => _currentIndex = 2),
-            icon: const Icon(Icons.arrow_forward, size: 16),
-            label: const Text(
-              "Hỏi kỹ hơn",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
           ),
         ],
       ),
@@ -824,114 +875,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickStats(
-      int upcomingCount,
-      int overdue,
-      VaccinationRecord? nextRecord,
-      ) {
-    String nextDateStr = "---";
-    if (nextRecord != null) {
-      final date = DateTime.tryParse(nextRecord.reminderDate);
-      if (date != null) {
-        nextDateStr = DateFormat('dd').format(date) + "/${date.month}";
-      }
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatTile(
-            "Sắp tới",
-            nextDateStr,
-            Icons.calendar_today_rounded,
-            Colors.orange,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _buildStatTile(
-            "Trễ hẹn",
-            "$overdue mũi",
-            Icons.error_outline_rounded,
-            Colors.red,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatTile(
-      String label,
-      String value,
-      IconData icon,
-      Color color,
-      ) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style:
-                  const TextStyle(color: Colors.grey, fontSize: 12.5),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFamilyOverviewCard(HouseholdViewModel householdVm) {
     if (householdVm.members.length <= 1) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1013,23 +960,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAppointmentSummary() {
-    final apptVm = context.read<AppointmentViewModel>();
-    final upcoming = apptVm.upcoming;
+    final householdVm = context.watch<HouseholdViewModel>();
+    final apptVm = context.watch<AppointmentViewModel>();
+    final mid = householdVm.selectedMember?.id;
+    if (mid == null) return const SizedBox.shrink();
+    final upcoming = List<Appointment>.from(apptVm.upcomingForMember(mid))
+      ..sort((a, b) {
+        final da = DateTime.tryParse(a.appointmentDate);
+        final db = DateTime.tryParse(b.appointmentDate);
+        if (da == null || db == null) return 0;
+        return da.compareTo(db);
+      });
     if (upcoming.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1063,34 +1007,9 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          d != null ? d.day.toString() : '--',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Colors.orange,
-                          ),
-                        ),
-                        Text(
-                          d != null ? 'Th${d.month}' : '--',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+                  AppointmentDateBadge(
+                    date: d,
+                    accentColor: Colors.orange,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1313,7 +1232,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           _buildAppHeader(
-              "Lịch sử tiêm chủng - ${householdVm.selectedMember?.name ?? ''}"),
+            'Lịch sử tiêm chủng',
+            memberName: householdVm.selectedMember?.name,
+          ),
           _buildFilterChips(),
           Expanded(
             child: filteredRecords.isEmpty
@@ -1325,7 +1246,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildAppHeader(String title) {
+  Widget _buildAppHeader(String title, {String? memberName}) {
+    final sub = memberName?.trim();
+    final hasMember = sub != null && sub.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
       color: Colors.white,
@@ -1335,14 +1259,32 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const SizedBox(width: 42),
               Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (hasMember) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        sub,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Container(
@@ -1602,7 +1544,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      "Mũi ${r.dose} • ${DateFormat('dd/MM/yyyy').format(DateTime.parse(r.date))}",
+                      DateFormat('dd/MM/yyyy').format(DateTime.parse(r.date)),
                       style: const TextStyle(
                         color: Color(0xFF828282),
                         fontSize: 12,
@@ -1679,48 +1621,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return AppTheme.success;
       default:
         return AppTheme.primary;
-    }
-  }
-
-  Future<void> _fetchAIInsights() async {
-    if (!mounted || _isInsightLoaded) return;
-
-    final vm = context.read<VaccinationViewModel>();
-    final householdVm = context.read<HouseholdViewModel>();
-
-    if (vm.records.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _aiInsight =
-          "Hãy thêm mũi tiêm để AI có thể đưa ra phân tích cho gia đình bạn.";
-        });
-      }
-      return;
-    }
-
-    final summary = vm.records.map((r) {
-      final member = householdVm.members
-          .where((m) => m.id == r.memberId)
-          .map((m) => m.name)
-          .firstOrNull ??
-          "Ẩn danh";
-      return "- $member: ${r.vaccineName} (Mũi ${r.dose}) - Ngày: ${r.date}";
-    }).join("\n");
-
-    try {
-      final insights = await AIService().getFamilyInsights(summary);
-      if (mounted) {
-        setState(() {
-          _aiInsight = insights;
-          _isInsightLoaded = true;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _aiInsight = "Không thể kết nối với trí tuệ nhân tạo lúc này.";
-        });
-      }
     }
   }
 

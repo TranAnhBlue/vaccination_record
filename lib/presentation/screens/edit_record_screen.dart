@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
+import '../sync/user_medical_data_sync.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -23,7 +24,6 @@ class EditRecordScreen extends StatefulWidget {
 class _EditRecordScreenState extends State<EditRecordScreen> {
   bool _isSuccess = false;
   late TextEditingController nameController;
-  late TextEditingController doseController;
   late TextEditingController locationController;
   late TextEditingController reactionController;
 
@@ -39,7 +39,6 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
   void initState() {
     super.initState();
     nameController = TextEditingController(text: widget.record.vaccineName);
-    doseController = TextEditingController(text: widget.record.dose.toString());
     locationController = TextEditingController(text: widget.record.location);
     reactionController = TextEditingController(text: widget.record.note);
     _injectionDate = _parseFlexibleDate(widget.record.date);
@@ -51,7 +50,6 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
   @override
   void dispose() {
     nameController.dispose();
-    doseController.dispose();
     locationController.dispose();
     reactionController.dispose();
     super.dispose();
@@ -117,21 +115,9 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
               _buildLabel("Loại vaccine"),
               _buildVaccineSelector(),
               const SizedBox(height: 16),
-              _buildLabel("Mũi số"),
               _buildTextFormField(
-                doseController,
-                "Nhập số mũi",
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return "Vui lòng nhập mũi số";
-                  }
-                  final parsed = int.tryParse(v.trim());
-                  if (parsed == null || parsed <= 0) {
-                    return "Mũi số không hợp lệ";
-                  }
-                  return null;
-                },
+                nameController,
+                'Ví dụ: BCG — Phòng lao - Mũi 2',
               ),
             ],
           ),
@@ -667,7 +653,6 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
         await vm.update(
           widget.record.copyWith(
             vaccineName: nameController.text.trim(),
-            dose: int.tryParse(doseController.text.trim()) ?? 1,
             date: DateFormat('yyyy-MM-dd').format(_injectionDate!),
             reminderDate: _reminderDate != null
                 ? DateFormat('yyyy-MM-dd').format(_reminderDate!)
@@ -678,6 +663,9 @@ class _EditRecordScreenState extends State<EditRecordScreen> {
           ),
         );
 
+        if (mounted) {
+          await syncUserMedicalData(context);
+        }
         if (mounted) {
           setState(() {
             _isLoading = false;

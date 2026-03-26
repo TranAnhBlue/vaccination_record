@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../viewmodels/household_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import '../../sync/user_medical_data_sync.dart';
 import '../../../domain/entities/member.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -67,23 +68,25 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
         surfaceTintColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            tooltip: "Xóa thành viên",
-            onPressed: _confirmDelete,
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.delete_outline_rounded,
-                color: Colors.red,
-                size: 20,
+          if (widget.member.relationship != 'Chủ hộ') ...[
+            IconButton(
+              tooltip: "Xóa thành viên",
+              onPressed: _confirmDelete,
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.red,
+                  size: 20,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
         ],
       ),
       body: SingleChildScrollView(
@@ -470,6 +473,7 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
 
     setState(() => _isLoading = true);
     final householdVm = context.read<HouseholdViewModel>();
+    final authVm = context.read<AuthViewModel>();
 
     try {
       await householdVm.updateMember(
@@ -484,7 +488,6 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
       );
 
       if (_relationship == "Chủ hộ") {
-        final authVm = context.read<AuthViewModel>();
         await authVm.updateProfile(
           nameController.text.trim(),
           DateFormat('yyyy-MM-dd').format(_dob!),
@@ -559,6 +562,9 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
 
     try {
       await householdVm.deleteMember(widget.member.id!);
+      if (mounted) {
+        await syncUserMedicalData(context);
+      }
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

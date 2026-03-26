@@ -6,6 +6,7 @@ import '../../domain/entities/vaccination_record.dart';
 import '../../core/theme/app_theme.dart';
 import '../viewmodels/vaccination_viewmodel.dart';
 import '../viewmodels/household_viewmodel.dart';
+import '../sync/user_medical_data_sync.dart';
 import '../widgets/certificate_card.dart';
 import 'edit_record_screen.dart';
 
@@ -210,7 +211,7 @@ class VaccinationDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "Mũi ${record.dose} • ${record.vaccineName}",
+                  record.vaccineName,
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13.5,
@@ -244,12 +245,6 @@ class VaccinationDetailScreen extends StatelessWidget {
             Icons.vaccines_outlined,
             "Loại vắc xin",
             record.vaccineName,
-          ),
-          _divider(),
-          _buildInfoRow(
-            Icons.format_list_numbered_rounded,
-            "Mũi số",
-            record.dose.toString(),
           ),
           _divider(),
           _buildInfoRow(
@@ -562,17 +557,21 @@ class VaccinationDetailScreen extends StatelessWidget {
               height: 50,
               child: ElevatedButton(
                 onPressed: () async {
-                  await context.read<VaccinationViewModel>().delete(record.id!);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Đã xóa mũi tiêm thành công"),
-                        backgroundColor: AppTheme.success,
-                      ),
-                    );
-                    Navigator.pop(ctx);
-                    Navigator.pop(context);
-                  }
+                  await context.read<VaccinationViewModel>().delete(
+                        record.id!,
+                        memberId: record.memberId,
+                      );
+                  if (!context.mounted) return;
+                  await syncUserMedicalData(context);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Đã xóa mũi tiêm thành công"),
+                      backgroundColor: AppTheme.success,
+                    ),
+                  );
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.danger,

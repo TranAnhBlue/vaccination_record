@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/member.dart';
 import '../../data/local/dao/member_dao.dart';
 import '../../data/models/member_model.dart';
-import '../../core/constants/session_manager.dart';
 
 class HouseholdViewModel extends ChangeNotifier {
   final memberDao = MemberDao();
@@ -58,8 +57,16 @@ class HouseholdViewModel extends ChangeNotifier {
   }
 
   Future<void> deleteMember(int id) async {
+    final index = members.indexWhere((m) => m.id == id);
+    if (index < 0) return;
+    final member = members[index];
+    if (member.relationship == 'Chủ hộ') {
+      throw Exception(
+        'Không thể xóa chủ hộ. Chỉ có thể xóa các thành viên khác trong gia đình.',
+      );
+    }
+    final userId = member.userId;
     await memberDao.delete(id);
-    final userId = members.firstWhere((m) => m.id == id, orElse: () => members.first).userId;
     if (selectedMember?.id == id) {
       selectedMember = null;
     }

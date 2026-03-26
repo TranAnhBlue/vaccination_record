@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../viewmodels/appointment_viewmodel.dart';
 import '../viewmodels/household_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../sync/user_medical_data_sync.dart';
+import '../widgets/appointment_date_badge.dart';
 import 'booking/booking_screen.dart';
 
 class ReminderScreen extends StatefulWidget {
@@ -26,10 +27,23 @@ class _ReminderScreenState extends State<ReminderScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     final authVm = context.read<AuthViewModel>();
-    if (authVm.currentUser?.id != null) {
-      context.read<AppointmentViewModel>().load(userId: authVm.currentUser!.id);
+    final uid = authVm.currentUser?.id;
+    if (uid == null) return;
+    await _ensureHouseholdLoaded();
+    if (!mounted) return;
+    await syncUserMedicalData(context);
+  }
+
+  /// Đảm bảo có danh sách thành viên trước khi đồng bộ tiêm chủng.
+  Future<void> _ensureHouseholdLoaded() async {
+    final h = context.read<HouseholdViewModel>();
+    final authVm = context.read<AuthViewModel>();
+    final uid = authVm.currentUser?.id;
+    if (uid == null) return;
+    if (h.members.isEmpty) {
+      await h.loadMembers(uid);
     }
   }
 
@@ -312,34 +326,10 @@ class _ReminderScreenState extends State<ReminderScreen>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 58,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        date != null ? date.day.toString() : '--',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: statusColor,
-                        ),
-                      ),
-                      Text(
-                        date != null ? 'Th${date.month}' : '--',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: statusColor,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
+                AppointmentDateBadge(
+                  date: date,
+                  accentColor: statusColor,
+                  size: AppointmentDateBadgeSize.standard,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -543,9 +533,14 @@ class _ReminderScreenState extends State<ReminderScreen>
             child: const Text('Huỷ'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final apptVm = context.read<AppointmentViewModel>();
               Navigator.pop(context);
-              context.read<AppointmentViewModel>().completeAppointment(id);
+              final mid = await apptVm.completeAppointment(id);
+              if (!mounted || mid == null) return;
+              await _ensureHouseholdLoaded();
+              if (!mounted) return;
+              await syncUserMedicalData(context);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.success,
@@ -582,9 +577,13 @@ class _ReminderScreenState extends State<ReminderScreen>
             child: const Text('Không'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              context.read<AppointmentViewModel>().cancelAppointment(id);
+              await context.read<AppointmentViewModel>().cancelAppointment(id);
+              if (!mounted) return;
+              await _ensureHouseholdLoaded();
+              if (!mounted) return;
+              await syncUserMedicalData(context);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.danger,

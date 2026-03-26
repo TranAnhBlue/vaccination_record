@@ -11,7 +11,6 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
     return await dao.insert(
       VaccinationRecordModel(
         vaccineName: record.vaccineName,
-        dose: record.dose,
         date: record.date,
         reminderDate: record.reminderDate,
         imagePath: record.imagePath,
@@ -29,7 +28,6 @@ class VaccinationRepositoryImpl implements VaccinationRepository {
       VaccinationRecordModel(
         id: record.id,
         vaccineName: record.vaccineName,
-        dose: record.dose,
         date: record.date,
         reminderDate: record.reminderDate,
         imagePath: record.imagePath,

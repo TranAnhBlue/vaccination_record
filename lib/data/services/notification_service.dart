@@ -88,7 +88,7 @@ class NotificationService {
       await _notificationsPlugin.zonedSchedule(
         record.id ?? record.hashCode,
         'Nhắc lịch tiêm chủng: ${record.vaccineName}',
-        'Đến ngày tiêm mũi ${record.dose} theo lịch hẹn của bạn tại ${record.location}.',
+        'Đến ngày tiêm ${record.vaccineName} theo lịch hẹn của bạn tại ${record.location}.',
         scheduledTime,
         const NotificationDetails(
           android: AndroidNotificationDetails(

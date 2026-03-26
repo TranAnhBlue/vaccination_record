@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/entities/user.dart';
 import '../../core/constants/session_manager.dart';
+import '../../core/utils/error_message_util.dart';
 
 class AuthViewModel extends ChangeNotifier {
   final AuthRepository repo;
@@ -21,19 +24,29 @@ class AuthViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
 
-    final user = await repo.login(phone, password);
-    loading = false;
+    try {
+      final user = await repo.login(phone, password);
+      loading = false;
 
-    if (user == null) {
-      error = 'Sai tài khoản hoặc mật khẩu';
+      if (user == null) {
+        error =
+            'Sai số điện thoại hoặc mật khẩu — không tìm thấy tài khoản hoặc mật khẩu không đúng.';
+        notifyListeners();
+        return false;
+      }
+
+      currentUser = user;
+      await SessionManager.saveLogin(phone);
+      notifyListeners();
+      return true;
+    } catch (e, stack) {
+      debugPrint('LOGIN_ERROR: $e\n$stack');
+      loading = false;
+      error =
+          'Đăng nhập không thành công. Nguyên nhân: ${readableTechnicalCause(e)}';
       notifyListeners();
       return false;
     }
-
-    currentUser = user;
-    await SessionManager.saveLogin(phone);
-    notifyListeners();
-    return true;
   }
 
   Future<void> loadUser() async {
@@ -80,7 +93,7 @@ class AuthViewModel extends ChangeNotifier {
     } catch (e, stack) {
       debugPrint('REGISTRATION_ERROR: $e\n$stack');
       loading = false;
-      error = 'Đăng ký thất bại. Vui lòng thử lại.';
+      error = _registerFailureMessage(e);
       notifyListeners();
       return false;
     }
@@ -98,9 +111,11 @@ class AuthViewModel extends ChangeNotifier {
       if (!success) error = 'Mật khẩu cũ không chính xác';
       notifyListeners();
       return success;
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('CHANGE_PASSWORD_ERROR: $e\n$stack');
       loading = false;
-      error = 'Lỗi khi đổi mật khẩu';
+      error =
+          'Đổi mật khẩu không thành công. Nguyên nhân: ${readableTechnicalCause(e)}';
       notifyListeners();
       return false;
     }
@@ -118,9 +133,11 @@ class AuthViewModel extends ChangeNotifier {
       loading = false;
       notifyListeners();
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('UPDATE_PROFILE_ERROR: $e\n$stack');
       loading = false;
-      error = 'Lỗi khi cập nhật hồ sơ';
+      error =
+          'Cập nhật hồ sơ không thành công. Nguyên nhân: ${readableTechnicalCause(e)}';
       notifyListeners();
       return false;
     }
@@ -130,5 +147,65 @@ class AuthViewModel extends ChangeNotifier {
     currentUser = null;
     SessionManager.clearLogin();
     notifyListeners();
+  }
+
+  /// Gom toàn bộ chuỗi lỗi có thể có trên Android/iOS/FFI — đôi khi không phải [DatabaseException] rõ ràng.
+  static String _flattenErrorText(Object e) {
+    final parts = <String>[e.toString()];
+    if (e is PlatformException) {
+      if (e.message != null) parts.add(e.message!);
+      if (e.details != null) parts.add(e.details.toString());
+    }
+    return parts.join(' ').toLowerCase();
+  }
+
+  /// Trùng SĐT: SQLite / plugin có nhiều biến thể thông điệp (kể cả [PlatformException] chưa bọc).
+  static bool _isDuplicatePhoneDbText(String lower) {
+    if (lower.contains('sqlite_constraint_unique')) return true;
+    if (lower.contains('constraint_unique')) return true;
+    if (RegExp(r'\b2067\b').hasMatch(lower)) return true;
+    if (lower.contains('unique') &&
+        lower.contains('constraint') &&
+        (lower.contains('phone') || lower.contains('users'))) {
+      return true;
+    }
+    return false;
+  }
+
+  static String _registerFailureMessage(Object e) {
+    final lower = _flattenErrorText(e);
+
+    if (_isDuplicatePhoneDbText(lower)) {
+      return 'Số điện thoại này đã được đăng ký';
+    }
+
+    if (e is DatabaseException) {
+      final dex = e;
+      if (dex.isUniqueConstraintError()) {
+        return 'Số điện thoại này đã được đăng ký';
+      }
+      int? code;
+      try {
+        code = dex.getResultCode();
+      } catch (_) {}
+      if (code == 2067) {
+        return 'Số điện thoại này đã được đăng ký';
+      }
+      if (dex.isNotNullConstraintError()) {
+        return 'Thiếu thông tin bắt buộc. Vui lòng kiểm tra lại biểu mẫu.';
+      }
+    }
+
+    if (lower.contains('foreign key')) {
+      return 'Lỗi cơ sở dữ liệu cục bộ. Hãy đóng app và thử lại, hoặc xóa dữ liệu ứng dụng.';
+    }
+    if (lower.contains('readonly') || lower.contains('open_failed')) {
+      return 'Không ghi được dữ liệu cục bộ. Kiểm tra dung lượng và quyền lưu trữ.';
+    }
+    if (lower.contains('database is locked') || lower.contains('sqlite_busy')) {
+      return 'Cơ sở dữ liệu đang bận. Vui lòng thử lại sau vài giây.';
+    }
+
+    return 'Đăng ký không thành công. Nguyên nhân: ${readableTechnicalCause(e)}';
   }
 }

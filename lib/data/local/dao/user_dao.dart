@@ -1,11 +1,11 @@
-import 'package:sqflite/sqflite.dart';
 import '../database_helper.dart';
 import '../../models/user_model.dart';
 
 class UserDao {
   Future<int> insert(UserModel user) async {
     final db = await DatabaseHelper.instance.database;
-    return db.insert("users", user.toMap());
+    final map = Map<String, dynamic>.from(user.toMap())..remove('id');
+    return db.insert("users", map);
   }
 
   Future<UserModel?> login(

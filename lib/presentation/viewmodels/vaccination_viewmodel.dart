@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../domain/entities/vaccination_record.dart';
 import '../../data/repositories/vaccination_repository_impl.dart';
 import '../../data/services/notification_service.dart';
@@ -30,6 +29,23 @@ class VaccinationViewModel extends ChangeNotifier {
       _cache[id] = list;
     }
     notifyListeners();
+  }
+
+  Future<void> syncAfterHouseholdChanged({
+    required List<int> memberIds,
+    int? preferredMemberId,
+  }) async {
+    _cache.removeWhere((id, _) => !memberIds.contains(id));
+    if (memberIds.isEmpty) {
+      records = [];
+      notifyListeners();
+      return;
+    }
+    await loadAllForMembers(memberIds);
+    final target = preferredMemberId != null && memberIds.contains(preferredMemberId)
+        ? preferredMemberId
+        : memberIds.first;
+    await load(memberId: target);
   }
 
   /// Lấy records của 1 member (từ cache hoặc load mới)

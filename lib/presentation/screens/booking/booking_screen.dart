@@ -5,9 +5,78 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/services/notification_service.dart';
 import '../../../domain/entities/vaccine_info.dart';
 import '../../../data/repositories/vaccine_info_repository.dart';
+import '../../../domain/services/vaccine_suggestion_service.dart';
 import '../../viewmodels/appointment_viewmodel.dart';
 import '../../viewmodels/household_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import '../../sync/user_medical_data_sync.dart';
+
+/// Gộp danh mục trong app + lịch BYT cho ô tìm vắc-xin.
+class _BookingVaccineOption {
+  final String name;
+  final String subtitle;
+
+  const _BookingVaccineOption({
+    required this.name,
+    required this.subtitle,
+  });
+}
+
+String _foldVietnamese(String input) {
+  const map = {
+    'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
+    'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
+    'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
+    'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
+    'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y',
+    'đ': 'd',
+  };
+  final lower = StringBuffer();
+  for (final c in input.toLowerCase().characters) {
+    lower.write(map[c] ?? c);
+  }
+  return lower.toString();
+}
+
+int _suggestionRank(_BookingVaccineOption item, String queryRaw) {
+  final q = _foldVietnamese(queryRaw.trim());
+  if (q.isEmpty) return 99;
+  final name = _foldVietnamese(item.name);
+  final sub = _foldVietnamese(item.subtitle);
+  if (name.startsWith(q)) return 0;
+  if (sub.startsWith(q)) return 1;
+  if (name.contains(q)) return 2;
+  if (sub.contains(q)) return 3;
+  return 99;
+}
+
+List<_BookingVaccineOption> _buildBookingVaccineCatalog() {
+  final seen = <String>{};
+  final out = <_BookingVaccineOption>[];
+
+  void add(String name, String subtitle) {
+    final key = name.toLowerCase().trim();
+    if (key.isEmpty || seen.contains(key)) return;
+    seen.add(key);
+    out.add(_BookingVaccineOption(name: name, subtitle: subtitle));
+  }
+
+  for (final v in VaccineInfoRepository().getAllVaccines()) {
+    add(v.name, v.schedule);
+  }
+  for (final s in VaccineSuggestionService.nationalScheduleForSearch) {
+    add(s.name, s.ageRange);
+  }
+  out.sort((a, b) => a.name.compareTo(b.name));
+  return out;
+}
 
 class BookingScreen extends StatefulWidget {
   final VaccineInfo? preSelectedVaccine;
@@ -38,14 +107,14 @@ class _BookingScreenState extends State<BookingScreen> {
     'Trạm y tế phường/xã',
   ];
 
-  late List<VaccineInfo> _allVaccines;
-  List<VaccineInfo> _filteredVaccines = [];
+  late List<_BookingVaccineOption> _vaccineCatalog;
+  List<_BookingVaccineOption> _filteredVaccines = [];
   bool _showDropdown = false;
 
   @override
   void initState() {
     super.initState();
-    _allVaccines = VaccineInfoRepository().getAllVaccines();
+    _vaccineCatalog = _buildBookingVaccineCatalog();
 
     if (widget.preSelectedVaccine != null) {
       _selectedVaccineName = widget.preSelectedVaccine!.name;
@@ -439,11 +508,28 @@ class _BookingScreenState extends State<BookingScreen> {
           controller: _vaccineSearchController,
           onChanged: (val) {
             setState(() {
-              _showDropdown = val.isNotEmpty;
-              _filteredVaccines = _allVaccines
-                  .where((v) =>
-                  v.name.toLowerCase().contains(val.toLowerCase()))
-                  .toList();
+              final q = val.trim();
+              if (_selectedVaccineName != null && val != _selectedVaccineName) {
+                _selectedVaccineName = null;
+              }
+              if (q.isEmpty) {
+                _showDropdown = false;
+                _filteredVaccines = [];
+                return;
+              }
+              _showDropdown = true;
+              final hits = _vaccineCatalog
+                  .where((e) => _suggestionRank(e, q) < 99)
+                  .toList()
+                ..sort((a, b) {
+                  final ra = _suggestionRank(a, q);
+                  final rb = _suggestionRank(b, q);
+                  final c = ra.compareTo(rb);
+                  if (c != 0) return c;
+                  return a.name.compareTo(b.name);
+                });
+              _filteredVaccines =
+                  hits.length > 50 ? hits.sublist(0, 50) : hits;
             });
           },
           decoration: InputDecoration(
@@ -459,6 +545,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 setState(() {
                   _selectedVaccineName = null;
                   _showDropdown = false;
+                  _filteredVaccines = [];
                 });
               },
             )
@@ -481,67 +568,94 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
           ),
         ),
-        if (_showDropdown && _filteredVaccines.isNotEmpty)
-          Container(
-            constraints: const BoxConstraints(maxHeight: 220),
-            margin: const EdgeInsets.only(top: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
+        if (_showDropdown &&
+            _vaccineSearchController.text.trim().isNotEmpty)
+          _filteredVaccines.isEmpty
+              ? Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: const Text(
+                    'Không có gợi ý trùng khớp. Bạn vẫn có thể dùng tên đã gõ khi đặt lịch.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF6B7280),
+                      height: 1.35,
+                    ),
+                  ),
+                )
+              : Container(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  margin: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: _filteredVaccines.length,
+                      itemBuilder: (context, i) {
+                        final v = _filteredVaccines[i];
+                        return ListTile(
+                          dense: true,
+                          leading: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.vaccines,
+                              color: AppTheme.primary,
+                              size: 18,
+                            ),
+                          ),
+                          title: Text(
+                            v.name,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            v.subtitle,
+                            style: const TextStyle(fontSize: 11.5),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () {
+                            FocusScope.of(context).unfocus();
+                            setState(() {
+                              _selectedVaccineName = v.name;
+                              _vaccineSearchController.text = v.name;
+                              _showDropdown = false;
+                              _filteredVaccines = [];
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ],
-            ),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _filteredVaccines.length,
-              itemBuilder: (context, i) {
-                final v = _filteredVaccines[i];
-                return ListTile(
-                  dense: true,
-                  leading: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.vaccines,
-                      color: AppTheme.primary,
-                      size: 18,
-                    ),
-                  ),
-                  title: Text(
-                    v.name,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  subtitle: Text(
-                    v.schedule,
-                    style: const TextStyle(fontSize: 11.5),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () {
-                    setState(() {
-                      _selectedVaccineName = v.name;
-                      _vaccineSearchController.text = v.name;
-                      _showDropdown = false;
-                    });
-                  },
-                );
-              },
-            ),
-          ),
-        if (_selectedVaccineName != null)
+        if (_vaccineSearchController.text.trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Container(
@@ -560,7 +674,10 @@ class _BookingScreenState extends State<BookingScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Đã chọn: $_selectedVaccineName',
+                      _selectedVaccineName ==
+                              _vaccineSearchController.text.trim()
+                          ? 'Đã chọn: ${_vaccineSearchController.text.trim()}'
+                          : 'Sẽ dùng tên: ${_vaccineSearchController.text.trim()}',
                       style: const TextStyle(
                         color: AppTheme.success,
                         fontSize: 12,
@@ -704,8 +821,9 @@ class _BookingScreenState extends State<BookingScreen> {
       _showError('Vui lòng chọn thành viên');
       return;
     }
-    if (_selectedVaccineName == null || _selectedVaccineName!.isEmpty) {
-      _showError('Vui lòng chọn vắc-xin');
+    final vaccineName = _vaccineSearchController.text.trim();
+    if (vaccineName.isEmpty) {
+      _showError('Vui lòng nhập hoặc chọn vắc-xin');
       return;
     }
 
@@ -714,7 +832,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
     final success = await apptVm.addAppointment(
       memberId: _selectedMemberId!,
-      vaccineName: _selectedVaccineName!,
+      vaccineName: vaccineName,
       center: _selectedCenter,
       date: _selectedDate,
       time: _selectedTime,
@@ -725,18 +843,19 @@ class _BookingScreenState extends State<BookingScreen> {
 
     if (success) {
       if (authVm.currentUser != null) {
-        apptVm.load(userId: authVm.currentUser!.id);
+        await syncUserMedicalData(context);
       }
+      if (!mounted) return;
 
       NotificationService().showInstantNotification(
         'Đặt lịch thành công 🎉',
-        'Lịch tiêm $_selectedVaccineName vào ${DateFormat('dd/MM/yyyy').format(_selectedDate)} lúc ${_selectedTime.format(context)} tại $_selectedCenter',
+        'Lịch tiêm $vaccineName vào ${DateFormat('dd/MM/yyyy').format(_selectedDate)} lúc ${_selectedTime.format(context)} tại $_selectedCenter',
       );
 
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đã đặt lịch tiêm $_selectedVaccineName thành công!'),
+          content: Text('Đã đặt lịch tiêm $vaccineName thành công!'),
           backgroundColor: AppTheme.success,
         ),
       );
